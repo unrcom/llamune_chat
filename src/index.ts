@@ -2,7 +2,11 @@
  * Llamune - ローカルLLMコーディング支援プラットフォーム
  */
 
+import 'dotenv/config';
 import { initDatabase, getAllModes } from './utils/database.js';
+import app from './api/server.js';
+
+const PORT = process.env.PORT || 3000;
 
 console.log('🦙 Llamune starting...');
 
@@ -19,5 +23,18 @@ modes.forEach(mode => {
   console.log(`  ${mode.icon} ${mode.display_name} (${mode.name})`);
 });
 
-console.log('');
-console.log('🎉 Llamune ready!');
+// APIサーバー起動
+app.listen(PORT, () => {
+  console.log('');
+  console.log(`🚀 API server running on http://localhost:${PORT}`);
+  console.log('');
+  console.log('Available endpoints:');
+  console.log('  GET  /api/health       - Health check');
+  console.log('  POST /api/auth/register - Register user');
+  console.log('  POST /api/auth/login    - Login');
+  console.log('  GET  /api/modes         - List modes');
+  console.log('  GET  /api/models        - List Ollama models');
+  console.log('  GET  /api/sessions      - List sessions');
+  console.log('  POST /api/chat/send     - Send message');
+  console.log('');
+});
