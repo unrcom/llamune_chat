@@ -102,6 +102,8 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<{
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let fullContent = '';
+  let fullThinking = '';
 
   try {
     while (true) {
@@ -117,21 +119,29 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<{
           try {
             const data = JSON.parse(line);
             
+            // 今回のチャンクの内容
+            const chunkContent = data.message?.content || '';
+            
             // 思考過程の抽出（<think>タグ対応）
-            const content = data.message?.content || '';
             let thinking: string | undefined;
-            let cleanContent = content;
+            let cleanContent = chunkContent;
 
             // <think>タグがある場合は分離
-            const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
+            const thinkMatch = chunkContent.match(/<think>([\s\S]*?)<\/think>/);
             if (thinkMatch) {
               thinking = thinkMatch[1];
-              cleanContent = content.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+              cleanContent = chunkContent.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+            }
+
+            // 累積
+            fullContent += cleanContent;
+            if (thinking) {
+              fullThinking += thinking;
             }
 
             yield {
-              content: cleanContent,
-              thinking,
+              content: fullContent,
+              thinking: fullThinking || undefined,
               done: data.done || false,
             };
           } catch {
