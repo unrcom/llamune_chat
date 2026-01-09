@@ -8,6 +8,30 @@ import type { Mode, Model, Session, Message } from '../types';
 import * as api from '../api/client';
 import './Chat.css';
 
+/**
+ * Thinking 折りたたみコンポーネント
+ */
+function ThinkingBlock({ thinking }: { thinking: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="thinking-block">
+      <button
+        className="thinking-toggle"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="thinking-icon">{isOpen ? '▼' : '▶'}</span>
+        <span>思考過程</span>
+      </button>
+      {isOpen && (
+        <div className="thinking-content">
+          {thinking}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Chat() {
   const { user, logout } = useAuth();
   const [modes, setModes] = useState<Mode[]>([]);
@@ -18,6 +42,7 @@ export function Chat() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [streamingThinking, setStreamingThinking] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
   const [selectedMode, setSelectedMode] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -93,20 +118,29 @@ export function Chat() {
     setInput('');
     setLoading(true);
     setStreamingContent('');
+    setStreamingThinking('');
 
     // ユーザーメッセージを追加
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
       let fullContent = '';
+      let fullThinking = '';
       for await (const chunk of api.sendMessage(currentSession, userMessage)) {
         fullContent = chunk.content;
+        fullThinking = chunk.thinking || '';
         setStreamingContent(chunk.content);
+        setStreamingThinking(chunk.thinking || '');
       }
 
       // ストリーミング完了後、アシスタントメッセージを追加
-      setMessages(prev => [...prev, { role: 'assistant', content: fullContent }]);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: fullContent,
+        thinking: fullThinking || undefined,
+      }]);
       setStreamingContent('');
+      setStreamingThinking('');
 
       // セッション一覧を更新
       const sessionsData = await api.getSessions();
@@ -184,14 +218,16 @@ export function Chat() {
                   <div className="message-role">
                     {msg.role === 'user' ? '👤 You' : '🤖 AI'}
                   </div>
+                  {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
                   <div className="message-content">
                     {msg.content}
                   </div>
                 </div>
               ))}
-              {streamingContent && (
+              {(streamingContent || streamingThinking) && (
                 <div className="message assistant">
                   <div className="message-role">🤖 AI</div>
+                  {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
                   <div className="message-content">{streamingContent}</div>
                 </div>
               )}

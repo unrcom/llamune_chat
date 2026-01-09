@@ -156,6 +156,49 @@
   background: #4a9eff33;
 }
 
+/* Thinking ブロック */
+.thinking-block {
+  margin-bottom: 0.5rem;
+}
+
+.thinking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.thinking-toggle:hover {
+  background: #222;
+  color: #aaa;
+}
+
+.thinking-icon {
+  font-size: 0.7rem;
+}
+
+.thinking-content {
+  background: #0f0f23;
+  border: 1px solid #333;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 1rem;
+  color: #888;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* 入力エリア */
 .input-area {
   display: flex;
