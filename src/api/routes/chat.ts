@@ -72,9 +72,10 @@ router.post('/send', authMiddleware, async (req: AuthenticatedRequest, res: Resp
 
     try {
       for await (const chunk of chatStream({ model: currentModel, messages })) {
-        fullContent += chunk.content;
+        // chatStreamは既に累積されたcontentを返すので、そのまま使用
+        fullContent = chunk.content;
         if (chunk.thinking) {
-          fullThinking += chunk.thinking;
+          fullThinking = chunk.thinking;
         }
 
         // SSEイベント送信
@@ -164,9 +165,10 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
 
     try {
       for await (const chunk of chatStream({ model: currentModel, messages })) {
-        fullContent += chunk.content;
+        // chatStreamは既に累積されたcontentを返すので、そのまま使用
+        fullContent = chunk.content;
         if (chunk.thinking) {
-          fullThinking += chunk.thinking;
+          fullThinking = chunk.thinking;
         }
 
         const eventData = JSON.stringify({
