@@ -399,6 +399,7 @@ export function Chat() {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // プロジェクトフォルダ関連の状態
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
@@ -501,13 +502,17 @@ export function Chat() {
     setStreamingContent('');
     setStreamingThinking('');
 
+    // AbortControllerを作成
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     // ユーザーメッセージを追加
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
       let fullContent = '';
       let fullThinking = '';
-      for await (const chunk of api.sendMessage(currentSession, userMessage)) {
+      for await (const chunk of api.sendMessage(currentSession, userMessage, undefined, controller.signal)) {
         fullContent = chunk.content;
         fullThinking = chunk.thinking || '';
         setStreamingContent(chunk.content);
@@ -527,9 +532,37 @@ export function Chat() {
       const sessionsData = await api.getSessions();
       setSessions(sessionsData);
     } catch (err) {
-      console.error('Failed to send message:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Message sending cancelled by user');
+        // キャンセル時は最後のユーザーメッセージを削除して入力欄に戻す
+        setMessages(prev => {
+          const newMessages = [...prev];
+          // 最後のユーザーメッセージを探して削除
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            if (newMessages[i].role === 'user') {
+              newMessages.splice(i, 1);
+              break;
+            }
+          }
+          return newMessages;
+        });
+        setInput(userMessage);
+      } else {
+        console.error('Failed to send message:', err);
+      }
     } finally {
       setLoading(false);
+      setStreamingContent('');
+      setStreamingThinking('');
+      abortControllerRef.current = null;
+    }
+  };
+
+  // ストリーミングをキャンセル
+  const handleCancelStreaming = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
   };
 
@@ -613,12 +646,16 @@ export function Chat() {
     setStreamingContent('');
     setStreamingThinking('');
 
+    // AbortControllerを作成
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       let fullContent = '';
       let fullThinking = '';
       let retryModel = model;
 
-      for await (const chunk of api.retryMessage(currentSession, model)) {
+      for await (const chunk of api.retryMessage(currentSession, model, controller.signal)) {
         fullContent = chunk.content;
         fullThinking = chunk.thinking || '';
         retryModel = chunk.model;
@@ -637,10 +674,17 @@ export function Chat() {
       setStreamingThinking('');
       setRetryPending(true);
     } catch (err) {
-      console.error('Failed to retry:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Retry cancelled by user');
+      } else {
+        console.error('Failed to retry:', err);
+      }
       setOriginalAnswer(null);
     } finally {
       setIsRetrying(false);
+      setStreamingContent('');
+      setStreamingThinking('');
+      abortControllerRef.current = null;
     }
   };
 
@@ -886,9 +930,15 @@ export function Chat() {
                 placeholder="メッセージを入力..."
                 disabled={loading || isRetrying || retryPending}
               />
-              <button onClick={handleSend} disabled={loading || isRetrying || retryPending || !input.trim()}>
-                {loading || isRetrying ? '...' : '送信'}
-              </button>
+              {loading || isRetrying ? (
+                <button className="stop-btn" onClick={handleCancelStreaming}>
+                  ⏹️ 停止
+                </button>
+              ) : (
+                <button onClick={handleSend} disabled={retryPending || !input.trim()}>
+                  送信
+                </button>
+              )}
             </div>
           </>
         ) : (

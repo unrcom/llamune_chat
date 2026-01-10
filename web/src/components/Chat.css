@@ -505,6 +505,14 @@
   cursor: not-allowed;
 }
 
+.input-area button.stop-btn {
+  background: #dc3545;
+}
+
+.input-area button.stop-btn:hover {
+  background: #c82333;
+}
+
 /* セッションなし */
 .no-session {
   display: flex;

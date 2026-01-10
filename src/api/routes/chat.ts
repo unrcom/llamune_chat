@@ -123,9 +123,6 @@ router.post('/send', authMiddleware, async (req: AuthenticatedRequest, res: Resp
     // プロジェクトパスを取得
     const projectPath = sessionData.session.project_path || null;
 
-    // ユーザーメッセージを保存
-    saveMessage(sessionId, 'user', message);
-
     // メッセージ履歴を構築
     const messages: ChatMessage[] = [];
     
@@ -216,7 +213,8 @@ router.post('/send', authMiddleware, async (req: AuthenticatedRequest, res: Resp
         }
       }
 
-      // アシスタントメッセージを保存
+      // ストリーミング完了後にメッセージを保存（キャンセル時は保存されない）
+      saveMessage(sessionId, 'user', message);
       saveMessage(sessionId, 'assistant', fullContent, currentModel, fullThinking || undefined);
 
       res.write('data: [DONE]\n\n');

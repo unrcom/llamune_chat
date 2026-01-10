@@ -202,12 +202,14 @@ export async function updateSessionTitle(id: number, title: string) {
 export async function* sendMessage(
   sessionId: number,
   message: string,
-  model?: string
+  model?: string,
+  signal?: AbortSignal
 ): AsyncGenerator<{ content: string; thinking?: string; done: boolean }> {
   const response = await authFetch(`${API_BASE}/chat/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId, message, model }),
+    signal,
   });
 
   if (!response.ok) {
@@ -259,12 +261,14 @@ export async function* sendMessage(
 
 export async function* retryMessage(
   sessionId: number,
-  model: string
+  model: string,
+  signal?: AbortSignal
 ): AsyncGenerator<{ content: string; thinking?: string; model: string; done: boolean }> {
   const response = await authFetch(`${API_BASE}/chat/retry`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId, model }),
+    signal,
   });
 
   if (!response.ok) {
