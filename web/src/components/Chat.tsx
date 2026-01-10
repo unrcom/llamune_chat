@@ -126,6 +126,196 @@ function RetryModal({
 }
 
 /**
+ * ディレクトリツリーアイテム
+ */
+function DirectoryItem({
+  node,
+  onExpand,
+  onSelect,
+  selectedPath,
+  expandedPaths,
+}: {
+  node: api.DirectoryNode;
+  onExpand: (path: string) => void;
+  onSelect: (path: string) => void;
+  selectedPath: string | null;
+  expandedPaths: Set<string>;
+}) {
+  const isExpanded = expandedPaths.has(node.path);
+  const isSelected = selectedPath === node.path;
+
+  const handleClick = () => {
+    if (isExpanded) {
+      onSelect(node.path);
+    } else {
+      onExpand(node.path);
+    }
+  };
+
+  return (
+    <div className="directory-item-wrapper">
+      <div
+        className={`directory-item ${isSelected ? 'selected' : ''}`}
+        onClick={handleClick}
+      >
+        <span className="directory-icon">{isExpanded ? '📂' : '📁'}</span>
+        <span className="directory-name">{node.name}</span>
+      </div>
+      {isExpanded && node.children && node.children.length > 0 && (
+        <div className="directory-children">
+          {node.children.map((child) => (
+            <DirectoryItem
+              key={child.path}
+              node={child}
+              onExpand={onExpand}
+              onSelect={onSelect}
+              selectedPath={selectedPath}
+              expandedPaths={expandedPaths}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * ディレクトリ選択モーダル
+ */
+function DirectoryTreeModal({
+  isOpen,
+  onClose,
+  onSelect,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (path: string) => void;
+}) {
+  const [rootNode, setRootNode] = useState<api.DirectoryNode | null>(null);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 初期ロード
+  useEffect(() => {
+    if (isOpen && !rootNode) {
+      loadDirectory();
+    }
+  }, [isOpen]);
+
+  const loadDirectory = async (path?: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.getDirectoryTree(path);
+
+      if (path) {
+        setRootNode((prevRoot) => {
+          if (!prevRoot) return data;
+          return updateNodeChildren(prevRoot, path, data.children || []);
+        });
+      } else {
+        setRootNode(data);
+        setExpandedPaths(new Set([data.path]));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'エラーが発生しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateNodeChildren = (
+    node: api.DirectoryNode,
+    targetPath: string,
+    children: api.DirectoryNode[]
+  ): api.DirectoryNode => {
+    if (node.path === targetPath) {
+      return { ...node, children };
+    }
+    if (node.children) {
+      return {
+        ...node,
+        children: node.children.map((child) =>
+          updateNodeChildren(child, targetPath, children)
+        ),
+      };
+    }
+    return node;
+  };
+
+  const handleExpand = async (path: string) => {
+    const newExpandedPaths = new Set(expandedPaths);
+    if (newExpandedPaths.has(path)) {
+      newExpandedPaths.delete(path);
+      setExpandedPaths(newExpandedPaths);
+    } else {
+      newExpandedPaths.add(path);
+      setExpandedPaths(newExpandedPaths);
+      await loadDirectory(path);
+    }
+  };
+
+  const handleSelect = (path: string) => {
+    setSelectedPath(path);
+  };
+
+  const handleConfirm = () => {
+    if (selectedPath) {
+      onSelect(selectedPath);
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal directory-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>📁 プロジェクトフォルダを選択</h3>
+
+        <div className="directory-tree">
+          {loading && !rootNode && (
+            <div className="directory-loading">読み込み中...</div>
+          )}
+          {error && (
+            <div className="directory-error">{error}</div>
+          )}
+          {rootNode && (
+            <DirectoryItem
+              node={rootNode}
+              onExpand={handleExpand}
+              onSelect={handleSelect}
+              selectedPath={selectedPath}
+              expandedPaths={expandedPaths}
+            />
+          )}
+        </div>
+
+        {selectedPath && (
+          <div className="directory-selected">
+            <span className="directory-selected-label">選択中:</span>
+            <span className="directory-selected-path">{selectedPath}</span>
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button onClick={onClose}>キャンセル</button>
+          <button 
+            onClick={handleConfirm} 
+            className="primary"
+            disabled={!selectedPath}
+          >
+            選択
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * 回答比較コンポーネント
  */
 function CompareAnswers({
@@ -207,6 +397,10 @@ export function Chat() {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // プロジェクトフォルダ関連の状態
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
+  const [showDirectoryModal, setShowDirectoryModal] = useState(false);
+
   // リトライ関連の状態
   const [showRetryModal, setShowRetryModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -274,7 +468,7 @@ export function Chat() {
     if (!selectedModel || !selectedMode) return;
     
     try {
-      const data = await api.createSession(selectedModel, selectedMode);
+      const data = await api.createSession(selectedModel, selectedMode, selectedProjectPath || undefined);
       setSessions(prev => [...prev, { ...data.session, message_count: 0 }]);
       setCurrentSession(data.session.id);
       setMessages([]);
@@ -283,6 +477,7 @@ export function Chat() {
       setModeDisplayName(data.modeDisplayName || null);
       setModeIcon(data.modeIcon || null);
       setShowNewChat(false);
+      setSelectedProjectPath(null); // リセット
     } catch (err) {
       console.error('Failed to create session:', err);
     }
@@ -616,13 +811,49 @@ export function Chat() {
               </select>
             </div>
 
+            <div className="form-group">
+              <label>プロジェクトフォルダ（オプション）</label>
+              <div className="project-path-selector">
+                <input
+                  type="text"
+                  value={selectedProjectPath || ''}
+                  readOnly
+                  placeholder="フォルダを選択..."
+                  className="project-path-input"
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowDirectoryModal(true)}
+                  className="browse-btn"
+                >
+                  📁 参照
+                </button>
+                {selectedProjectPath && (
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedProjectPath(null)}
+                    className="clear-btn"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="modal-actions">
-              <button onClick={() => setShowNewChat(false)}>キャンセル</button>
+              <button onClick={() => { setShowNewChat(false); setSelectedProjectPath(null); }}>キャンセル</button>
               <button onClick={handleNewChat} className="primary">開始</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ディレクトリ選択モーダル */}
+      <DirectoryTreeModal
+        isOpen={showDirectoryModal}
+        onClose={() => setShowDirectoryModal(false)}
+        onSelect={(path) => setSelectedProjectPath(path)}
+      />
 
       {/* リトライモーダル */}
       <RetryModal

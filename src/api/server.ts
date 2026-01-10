@@ -10,6 +10,7 @@ import modesRouter from './routes/modes.js';
 import sessionsRouter from './routes/sessions.js';
 import chatRouter from './routes/chat.js';
 import modelsRouter from './routes/models.js';
+import filesystemRouter from './routes/filesystem.js';
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/modes', modesRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/models', modelsRouter);
+app.use('/api/filesystem', filesystemRouter);
 
 // ヘルスチェック
 app.get('/api/health', (req, res) => {

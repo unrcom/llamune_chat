@@ -612,3 +612,138 @@
   border: 1px dashed #4a9eff;
   background: #1a2a4e;
 }
+
+/* プロジェクトパス選択 */
+.project-path-selector {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.project-path-input {
+  flex: 1;
+  padding: 0.5rem;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 0.85rem;
+}
+
+.browse-btn {
+  padding: 0.5rem 0.75rem;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.browse-btn:hover {
+  background: #444;
+}
+
+.clear-btn {
+  padding: 0.5rem 0.75rem;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.clear-btn:hover {
+  background: #444;
+  color: #fff;
+}
+
+/* ディレクトリ選択モーダル */
+.directory-modal {
+  max-width: 600px;
+  width: 100%;
+}
+
+.directory-tree {
+  max-height: 400px;
+  overflow-y: auto;
+  background: #0f0f23;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.directory-loading,
+.directory-error {
+  padding: 2rem;
+  text-align: center;
+  color: #888;
+}
+
+.directory-error {
+  color: #ff6b6b;
+}
+
+.directory-item-wrapper {
+  user-select: none;
+}
+
+.directory-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.directory-item:hover {
+  background: #1a1a2e;
+}
+
+.directory-item.selected {
+  background: #1a2a4e;
+}
+
+.directory-icon {
+  font-size: 1rem;
+}
+
+.directory-name {
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.directory-children {
+  margin-left: 1.25rem;
+  border-left: 1px solid #333;
+  padding-left: 0.5rem;
+}
+
+.directory-selected {
+  padding: 0.75rem;
+  background: #1a2a4e;
+  border: 1px solid #4a9eff;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.directory-selected-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 0.25rem;
+}
+
+.directory-selected-path {
+  font-size: 0.85rem;
+  color: #4a9eff;
+  font-family: monospace;
+  word-break: break-all;
+}

@@ -162,11 +162,11 @@ export async function getSessions() {
   return (await response.json()).sessions;
 }
 
-export async function createSession(model: string, modeId?: number) {
+export async function createSession(model: string, modeId?: number, projectPath?: string) {
   const response = await authFetch(`${API_BASE}/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, modeId }),
+    body: JSON.stringify({ model, modeId, projectPath }),
   });
   if (!response.ok) throw new Error('Failed to create session');
   return await response.json();
@@ -320,4 +320,25 @@ export async function rejectRetry(sessionId: number): Promise<boolean> {
   if (!response.ok) throw new Error('Failed to reject retry');
   const data = await response.json();
   return data.success;
+}
+
+// ========================================
+// ファイルシステム API
+// ========================================
+
+export interface DirectoryNode {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  children?: DirectoryNode[];
+}
+
+export async function getDirectoryTree(path?: string): Promise<DirectoryNode> {
+  const url = path
+    ? `${API_BASE}/filesystem/tree?path=${encodeURIComponent(path)}`
+    : `${API_BASE}/filesystem/tree`;
+  
+  const response = await authFetch(url);
+  if (!response.ok) throw new Error('Failed to fetch directory tree');
+  return await response.json();
 }
