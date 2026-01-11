@@ -744,7 +744,7 @@ export function Chat() {
       {/* サイドバー */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h2>🦙 Llamune</h2>
+          <h2>🔵 llamune</h2>
           <button className="new-chat-btn" onClick={() => setShowNewChat(true)}>
             + 新しいチャット
           </button>
@@ -943,7 +943,7 @@ export function Chat() {
           </>
         ) : (
           <div className="no-session">
-            <h2>🦙 Llamune</h2>
+            <h2>🔵 llamune</h2>
             <p>新しいチャットを開始するか、左のセッションを選択してください</p>
             <button onClick={() => setShowNewChat(true)}>+ 新しいチャット</button>
           </div>

@@ -35,7 +35,7 @@ export function Login() {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1>🦙 Llamune</h1>
+        <h1>🔵 llamune</h1>
         <p className="subtitle">ローカルLLMコーディング支援</p>
 
         <form onSubmit={handleSubmit}>
