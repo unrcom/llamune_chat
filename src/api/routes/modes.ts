@@ -56,15 +56,15 @@ router.get('/:id', (req, res: Response) => {
  */
 router.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { name, displayName, description, icon, systemPrompt } = req.body;
+    const { displayName, description, icon, systemPrompt } = req.body;
 
     // バリデーション
-    if (!name || !displayName) {
-      res.status(400).json({ error: 'Name and displayName are required', code: 'VALIDATION_ERROR' });
+    if (!displayName) {
+      res.status(400).json({ error: 'displayName is required', code: 'VALIDATION_ERROR' });
       return;
     }
 
-    const id = createMode(name, displayName, description || null, icon || null, systemPrompt || null);
+    const id = createMode(displayName, description || null, icon || null, systemPrompt || null);
 
     const mode = getModeById(id);
     res.status(201).json({ mode });
@@ -85,10 +85,9 @@ router.put('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
-    const { name, displayName, description, icon, systemPrompt } = req.body;
+    const { displayName, description, icon, systemPrompt } = req.body;
 
     const success = updateMode(id, {
-      name,
       displayName,
       description,
       icon,

@@ -10,7 +10,6 @@ export type User = {
 
 export type Mode = {
   id: number;
-  name: string;
   display_name: string;
   description: string | null;
   icon: string | null;

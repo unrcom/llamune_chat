@@ -48,7 +48,6 @@ export interface RefreshToken {
  */
 export interface Mode {
   id: number;
-  name: string;
   display_name: string;
   description: string | null;
   icon: string | null;
@@ -342,25 +341,10 @@ export function getModeById(id: number): Mode | null {
 /**
  * 名前でモードを取得
  */
-export function getModeByName(name: string): Mode | null {
-  const db = initDatabase();
-
-  try {
-    const mode = db
-      .prepare('SELECT * FROM modes WHERE name = ? AND enabled = 1')
-      .get(name) as Mode | undefined;
-
-    return mode || null;
-  } finally {
-    db.close();
-  }
-}
-
 /**
  * モードを作成
  */
 export function createMode(
-  name: string,
   displayName: string,
   description: string | null,
   icon: string | null,
@@ -370,6 +354,25 @@ export function createMode(
   const now = new Date().toISOString();
 
   try {
+    // 一意のname生成（内部的にのみ使用、display_nameをベースに作成）
+    const baseName = displayName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    
+    let name = baseName;
+    let counter = 1;
+    
+    // 重複チェック
+    while (true) {
+      const existing = db
+        .prepare('SELECT id FROM modes WHERE name = ?')
+        .get(name);
+      if (!existing) break;
+      name = `${baseName}_${counter}`;
+      counter++;
+    }
+    
     const result = db
       .prepare(`
         INSERT INTO modes (name, display_name, description, icon, system_prompt, is_default, enabled, created_at, updated_at)
@@ -389,7 +392,6 @@ export function createMode(
 export function updateMode(
   id: number,
   updates: {
-    name?: string;
     displayName?: string;
     description?: string | null;
     icon?: string | null;
@@ -405,7 +407,6 @@ export function updateMode(
       return false;
     }
 
-    const newName = updates.name ?? mode.name;
     const newDisplayName = updates.displayName ?? mode.display_name;
     const newDescription = updates.description !== undefined ? updates.description : mode.description;
     const newIcon = updates.icon !== undefined ? updates.icon : mode.icon;
@@ -414,10 +415,10 @@ export function updateMode(
     const result = db
       .prepare(`
         UPDATE modes 
-        SET name = ?, display_name = ?, description = ?, icon = ?, system_prompt = ?, updated_at = ?
+        SET display_name = ?, description = ?, icon = ?, system_prompt = ?, updated_at = ?
         WHERE id = ?
       `)
-      .run(newName, newDisplayName, newDescription, newIcon, newSystemPrompt, now, id);
+      .run(newDisplayName, newDescription, newIcon, newSystemPrompt, now, id);
 
     return result.changes > 0;
   } finally {
@@ -571,7 +572,6 @@ export function getSession(sessionId: number, userId?: number): {
 
     // モード情報とシステムプロンプトを取得
     let systemPrompt: string | undefined;
-    let modeName: string | undefined;
     let modeDisplayName: string | undefined;
     let modeIcon: string | undefined;
 
@@ -581,16 +581,14 @@ export function getSession(sessionId: number, userId?: number): {
     
     if (session.mode_id) {
       const mode = db
-        .prepare('SELECT name, display_name, icon, system_prompt FROM modes WHERE id = ?')
+        .prepare('SELECT display_name, icon, system_prompt FROM modes WHERE id = ?')
         .get(session.mode_id) as { 
-          name?: string;
           display_name?: string;
           icon?: string;
           system_prompt?: string;
         } | undefined;
       
       if (mode) {
-        modeName = mode.name;
         modeDisplayName = mode.display_name;
         modeIcon = mode.icon || undefined;
         if (!systemPrompt) {
@@ -626,7 +624,6 @@ export function getSession(sessionId: number, userId?: number): {
       session,
       messages,
       systemPrompt,
-      modeName,
       modeDisplayName,
       modeIcon,
     };

@@ -149,7 +149,6 @@ export async function getMode(id: number) {
 }
 
 export async function createMode(data: {
-  name: string;
   displayName: string;
   description?: string;
   icon?: string;
@@ -170,7 +169,6 @@ export async function createMode(data: {
 export async function updateMode(
   id: number,
   data: {
-    name?: string;
     displayName?: string;
     description?: string;
     icon?: string;
