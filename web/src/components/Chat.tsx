@@ -35,6 +35,18 @@ function ThinkingBlock({ thinking }: { thinking: string }) {
 }
 
 /**
+ * ローディングインジケーター（スピナー）コンポーネント
+ */
+function LoadingIndicator({ message = '回答を生成中...' }: { message?: string }) {
+  return (
+    <div className="loading-indicator">
+      <div className="spinner" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+/**
  * システムプロンプト折りたたみコンポーネント
  */
 function SystemPromptBlock({ 
@@ -1045,24 +1057,32 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
               )}
 
               {/* ストリーミング中（通常送信） */}
-              {(streamingContent || streamingThinking) && !isRetrying && (
+              {loading && !isRetrying && (
                 <div className="message assistant">
                   <div className="message-role">🤖 AI</div>
                   {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  <div className="message-content markdown-body">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
-                  </div>
+                  {(streamingContent || streamingThinking) ? (
+                    <div className="message-content markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <LoadingIndicator />
+                  )}
                 </div>
               )}
 
               {/* リトライ中のストリーミング */}
               {isRetrying && (
                 <div className="message assistant streaming-retry">
-                  <div className="message-role">🤖 AI (リトライ中...)</div>
+                  <div className="message-role">🤖 AI (リトライ中)</div>
                   {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  <div className="message-content markdown-body">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent || '生成中...'}</ReactMarkdown>
-                  </div>
+                  {(streamingContent || streamingThinking) ? (
+                    <div className="message-content markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <LoadingIndicator message="別のモデルで生成中..." />
+                  )}
                 </div>
               )}
 

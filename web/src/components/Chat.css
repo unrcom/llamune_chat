@@ -1124,3 +1124,38 @@
   border-color: #dc3545;
   color: #fff;
 }
+
+/* スピナー（ローディングインジケーター） */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #333;
+  border-top-color: #4a9eff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* メッセージ内のスピナー（リトライ用） */
+.message .loading-indicator {
+  padding: 0.5rem 0;
+}
+
+.message .spinner {
+  width: 16px;
+  height: 16px;
+}
