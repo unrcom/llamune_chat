@@ -530,6 +530,16 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const [importedData, setImportedData] = useState<ImportedSession | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 新規チャット準備状態（DBに未作成）
+  const [pendingNewChat, setPendingNewChat] = useState<{
+    model: string;
+    modeId: number;
+    projectPath: string | null;
+    systemPrompt: string | null;
+    modeDisplayName: string | null;
+    modeIcon: string | null;
+  } | null>(null);
+
   // 初期データ取得
   useEffect(() => {
     const fetchData = async () => {
@@ -565,6 +575,9 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setStreamingThinking('');
     
     if (currentSession) {
+      // 既存セッション選択時はpendingNewChatをクリア
+      setPendingNewChat(null);
+      
       const fetchMessages = async () => {
         try {
           const data = await api.getSession(currentSession);
@@ -592,29 +605,43 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
-  // 新しいチャット作成
+  // 新しいチャット作成（準備状態にするだけ、DBには作成しない）
   const handleNewChat = async () => {
     if (!selectedModel || !selectedMode) return;
     
     try {
-      const data = await api.createSession(selectedModel, selectedMode, selectedProjectPath || undefined);
-      setSessions(prev => [...prev, { ...data.session, message_count: 0 }]);
-      setCurrentSession(data.session.id);
+      // モード情報を取得
+      const modeData = await api.getMode(selectedMode);
+      
+      // 準備状態を設定（DBにはまだ作成しない）
+      setPendingNewChat({
+        model: selectedModel,
+        modeId: selectedMode,
+        projectPath: selectedProjectPath,
+        systemPrompt: modeData.system_prompt || null,
+        modeDisplayName: modeData.display_name || null,
+        modeIcon: modeData.icon || null,
+      });
+      
+      // UIを新規チャット状態に
+      setCurrentSession(null);
       setMessages([]);
-      setSystemPrompt(data.systemPrompt || null);
-      setSessionModel(data.session?.model || selectedModel);
-      setModeDisplayName(data.modeDisplayName || null);
-      setModeIcon(data.modeIcon || null);
+      setSystemPrompt(modeData.system_prompt || null);
+      setSessionModel(selectedModel);
+      setModeDisplayName(modeData.display_name || null);
+      setModeIcon(modeData.icon || null);
       setShowNewChat(false);
-      setSelectedProjectPath(null); // リセット
+      setSelectedProjectPath(null);
     } catch (err) {
-      console.error('Failed to create session:', err);
+      console.error('Failed to prepare new chat:', err);
     }
   };
 
   // メッセージ送信
   const handleSend = async () => {
-    if (!input.trim() || !currentSession || loading) return;
+    // pendingNewChatがある場合、またはcurrentSessionがある場合に送信可能
+    if (!input.trim() || loading) return;
+    if (!currentSession && !pendingNewChat) return;
 
     const userMessage = input.trim();
     setInput('');
@@ -630,9 +657,26 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
+      // 新規チャットの場合、まずセッションを作成
+      let sessionId = currentSession;
+      if (!sessionId && pendingNewChat) {
+        const data = await api.createSession(
+          pendingNewChat.model,
+          pendingNewChat.modeId,
+          pendingNewChat.projectPath || undefined
+        );
+        sessionId = data.session.id;
+        setCurrentSession(sessionId);
+        setPendingNewChat(null); // 準備状態をクリア
+      }
+
+      if (!sessionId) {
+        throw new Error('No session available');
+      }
+
       let fullContent = '';
       let fullThinking = '';
-      for await (const chunk of api.sendMessage(currentSession, userMessage, undefined, controller.signal)) {
+      for await (const chunk of api.sendMessage(sessionId, userMessage, undefined, controller.signal)) {
         fullContent = chunk.content;
         fullThinking = chunk.thinking || '';
         setStreamingContent(chunk.content);
@@ -1125,7 +1169,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
               <div ref={messagesEndRef} />
             </div>
           </>
-        ) : currentSession ? (
+        ) : (currentSession || pendingNewChat) ? (
           <>
             <div className="messages">
               {systemPrompt && (
