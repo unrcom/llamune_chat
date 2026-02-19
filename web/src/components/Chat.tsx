@@ -1042,7 +1042,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             >
               ☰
             </button>
-            <h2 className="sidebar-logo">llamune</h2>
+            <h2 className="sidebar-logo">llamune_chat</h2>
           </div>
           <button className="new-chat-btn" onClick={() => setShowNewChat(true)}>
             + 新しいチャット
@@ -1335,7 +1335,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           </>
         ) : (
           <div className="no-session">
-            <h2>🔵 llamune</h2>
+            <h2>🔵 llamune_chat</h2>
             <p>新しいチャットを開始するか、左のセッションを選択してください</p>
             <button onClick={() => setShowNewChat(true)}>+ 新しいチャット</button>
           </div>

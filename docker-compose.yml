@@ -1,4 +1,4 @@
-# llamune Docker Compose
+# llamune_chat Docker Compose
 #
 # 使い方:
 #   1. Ollamaを起動: ollama serve
@@ -8,20 +8,20 @@
 
 services:
   backend:
-    image: llamune/backend:latest
-    container_name: llamune_backend
+    image: llamune_chat/backend:latest
+    container_name: llamune_chat_backend
     environment:
       - OLLAMA_API_URL=http://host.docker.internal:11434
       - NODE_ENV=production
       - PORT=3000
     volumes:
-      - ~/.llamune:/root/.llamune
+      - ~/.llamune_chat:/root/.llamune_chat
     ports:
       - "3000:3000"
 
   frontend:
-    image: llamune/frontend:latest
-    container_name: llamune_frontend
+    image: llamune_chat/frontend:latest
+    container_name: llamune_chat_frontend
     depends_on:
       - backend
     ports:

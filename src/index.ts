@@ -1,5 +1,5 @@
 /**
- * Llamune - ローカルLLMコーディング支援プラットフォーム
+ * Llamune_chat - ローカルLLMコーディング支援プラットフォーム
  */
 
 import 'dotenv/config';
@@ -8,7 +8,7 @@ import app from './api/server.js';
 
 const PORT = process.env.PORT || 3000;
 
-console.log('🦙 Llamune starting...');
+console.log('🦙 Llamune_chat starting...');
 
 // データベース初期化
 console.log('📦 Initializing database...');

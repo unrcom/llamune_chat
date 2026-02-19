@@ -1,5 +1,5 @@
 /**
- * Llamune Web アプリケーション
+ * Llamune_chat Web アプリケーション
  */
 
 import { useState } from 'react';

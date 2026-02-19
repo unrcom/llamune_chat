@@ -7,17 +7,17 @@
 ### 1. イメージをビルド
 
 ```bash
-cd ~/dev/llamune
+cd ~/dev/llamune_chat
 
-docker build -t llamune/backend:latest -f Dockerfile.backend .
-docker build -t llamune/frontend:latest ./web
+docker build -t llamune_chat/backend:latest -f Dockerfile.backend .
+docker build -t llamune_chat/frontend:latest ./web
 ```
 
 ### 2. Docker Hubにpush
 
 ```bash
-docker push llamune/backend:latest
-docker push llamune/frontend:latest
+docker push llamune_chat/backend:latest
+docker push llamune_chat/frontend:latest
 ```
 
 ---

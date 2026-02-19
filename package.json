@@ -1,11 +1,11 @@
 {
-  "name": "llamune",
+  "name": "llamune_chat",
   "version": "0.1.0",
   "description": "ローカルLLMを活用したコーディング支援プラットフォーム",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "llamune": "dist/cli.js"
+    "llamune_chat": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Llamune CLI
+ * Llamune_chat CLI
  */
 
 import 'dotenv/config';
@@ -263,7 +263,7 @@ ${colors.cyan}コマンド:${colors.reset}
  */
 async function main(): Promise<void> {
   console.log(`
-${colors.bright}${colors.cyan}🦙 Llamune CLI${colors.reset}
+${colors.bright}${colors.cyan}🦙 Llamune_chat CLI${colors.reset}
 ${colors.dim}ローカルLLMコーディング支援${colors.reset}
 `);
 

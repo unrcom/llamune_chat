@@ -10,7 +10,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { encrypt, decrypt } from './encryption.js';
 
 // データベースファイルのパス
-const DB_DIR = join(homedir(), '.llamune');
+const DB_DIR = join(homedir(), '.llamune_chat');
 const DB_FILE = join(DB_DIR, 'data.db');
 
 // ========================================

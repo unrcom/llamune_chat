@@ -195,7 +195,7 @@ router.get('/:id/export', authMiddleware, (req: AuthenticatedRequest, res: Respo
     console.log('Export - safeTitle:', safeTitle);
     
     // Content-Dispositionヘッダーでファイル名を指定（RFC 5987形式で日本語対応）
-    const filename = `llamune_${safeTitle}_${id}.json`;
+    const filename = `llamune_chat_${safeTitle}_${id}.json`;
     console.log('Export - filename:', filename);
     const encodedFilename = encodeURIComponent(filename);
     console.log('Export - encodedFilename:', encodedFilename);

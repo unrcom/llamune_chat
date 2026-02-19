@@ -1,6 +1,6 @@
-# llamune Docker 起動ガイド
+# llamune_chat Docker 起動ガイド
 
-このガイドは、macOS（Appleシリコン）環境で llamune を Docker で起動するための詳細な手順です。
+このガイドは、macOS（Appleシリコン）環境で llamune_chat を Docker で起動するための詳細な手順です。
 
 ## 📋 動作環境
 
@@ -146,13 +146,13 @@ Cannot connect to the Docker daemon at unix:///Users/.../.docker/run/docker.sock
 
 ---
 
-## 3. llamune の起動
+## 3. llamune_chat の起動
 
 ### 3.1 docker-compose.yml をダウンロード
 
 以下のURLにアクセスして、`docker-compose.yml` をダウンロードしてください。
 
-https://raw.githubusercontent.com/unrcom/llamune/main/docker-compose.yml
+https://raw.githubusercontent.com/unrcom/llamune_chat/main/docker-compose.yml
 
 **ダウンロード方法：**
 1. 上記URLをブラウザで開く
@@ -163,7 +163,7 @@ https://raw.githubusercontent.com/unrcom/llamune/main/docker-compose.yml
 
 ```bash
 cd ~/Desktop
-curl -O https://raw.githubusercontent.com/unrcom/llamune/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/unrcom/llamune_chat/main/docker-compose.yml
 ```
 
 ---
@@ -180,15 +180,15 @@ docker compose up
 **初回起動時の表示例：**
 ```
 [+] Running 2/2
- ✔ Container llamune_backend   Started
- ✔ Container llamune_frontend  Started
-Attaching to llamune_backend, llamune_frontend
-llamune_backend  | 🦙 Llamune starting...
-llamune_backend  | 📦 Initializing database...
-llamune_backend  | ✅ Database initialized
-llamune_backend  | 🚀 API server running on http://localhost:3000
-llamune_frontend |   VITE v7.3.1  ready in 124 ms
-llamune_frontend |   ➜  Local:   http://localhost:5173/
+ ✔ Container llamune_chat_backend   Started
+ ✔ Container llamune_chat_frontend  Started
+Attaching to llamune_chat_backend, llamune_chat_frontend
+llamune_chat_backend  | 🦙 Llamune_chat starting...
+llamune_chat_backend  | 📦 Initializing database...
+llamune_chat_backend  | ✅ Database initialized
+llamune_chat_backend  | 🚀 API server running on http://localhost:3000
+llamune_chat_frontend |   VITE v7.3.1  ready in 124 ms
+llamune_chat_frontend |   ➜  Local:   http://localhost:5173/
 ```
 
 > ⏱️ **初回起動時間**: 約1〜2分（Dockerイメージのダウンロードが必要なため）
@@ -219,20 +219,20 @@ llamune_frontend |   ➜  Local:   http://localhost:5173/
 
 ## 5. 終了と再起動
 
-### 5.1 llamune を終了する
+### 5.1 llamune_chat を終了する
 
 Docker コンテナを起動したターミナルで `Ctrl + C` を押してください。
 
 ```
 ^CGracefully stopping... (press Ctrl+C again to force)
 [+] Stopping 2/2
- ✔ Container llamune_frontend  Stopped
- ✔ Container llamune_backend   Stopped
+ ✔ Container llamune_chat_frontend  Stopped
+ ✔ Container llamune_chat_backend   Stopped
 ```
 
 ---
 
-### 5.2 llamune を再起動する
+### 5.2 llamune_chat を再起動する
 
 ```bash
 cd ~/Desktop
@@ -271,7 +271,7 @@ Docker Desktop が起動していません。アプリケーションフォル�
 以前のコンテナが残っています。以下のコマンドで削除してから再起動してください：
 
 ```bash
-docker rm -f llamune_backend llamune_frontend
+docker rm -f llamune_chat_backend llamune_chat_frontend
 docker compose up
 ```
 
@@ -280,7 +280,7 @@ docker compose up
 ### データをリセットしたい
 
 ```bash
-rm -rf ~/.llamune
+rm -rf ~/.llamune_chat
 docker compose up
 ```
 
@@ -288,4 +288,4 @@ docker compose up
 
 ## 📞 サポート
 
-問題が解決しない場合は、[GitHub Issues](https://github.com/unrcom/llamune/issues) で報告してください。
+問題が解決しない場合は、[GitHub Issues](https://github.com/unrcom/llamune_chat/issues) で報告してください。

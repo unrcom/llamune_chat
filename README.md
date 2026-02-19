@@ -1,4 +1,4 @@
-# llamune
+# llamune_chat
 
 [![Status](https://img.shields.io/badge/status-development-orange)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
@@ -9,7 +9,7 @@
 
 ## 🎯 概要
 
-llamune は、機密情報を外部に送信せず、ローカルLLMでチャットできるプラットフォームです。
+llamune_chat は、機密情報を外部に送信せず、ローカルLLMでチャットできるプラットフォームです。
 
 **主な特徴：**
 - 🔒 **完全クローズド環境** - データは一切外部に送信されません
@@ -44,8 +44,8 @@ llamune は、機密情報を外部に送信せず、ローカルLLMでチャッ
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/unrcom/llamune.git
-cd llamune
+git clone https://github.com/unrcom/llamune_chat.git
+cd llamune_chat
 
 # Ollamaをホストで起動しておく
 ollama serve
@@ -62,8 +62,8 @@ docker compose up --build
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/unrcom/llamune.git
-cd llamune
+git clone https://github.com/unrcom/llamune_chat.git
+cd llamune_chat
 
 # 依存関係をインストール
 npm install
@@ -87,7 +87,7 @@ npm run dev
 ## 📁 プロジェクト構造
 
 ```
-llamune/
+llamune_chat/
 ├── src/
 │   ├── api/           # REST API (Express)
 │   │   ├── routes/    # APIルート
