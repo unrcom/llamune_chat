@@ -36,14 +36,14 @@ router.get('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
  */
 router.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { templateId, projectPath } = req.body;
+    const { templateId, projectPath, model } = req.body;
 
     if (!templateId) {
       res.status(400).json({ error: 'templateId is required', code: 'VALIDATION_ERROR' });
       return;
     }
 
-    const sessionId = createSession(templateId, req.user?.userId, projectPath);
+    const sessionId = createSession(templateId, req.user?.userId, projectPath, model);
 
     const sessionData = getSession(sessionId, req.user?.userId);
     if (!sessionData) {

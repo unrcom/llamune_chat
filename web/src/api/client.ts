@@ -133,67 +133,102 @@ export async function getMe() {
 }
 
 // ========================================
-// モード API
+// パラメータセットテンプレート API
 // ========================================
 
-export async function getModes() {
-  const response = await fetch(`${API_BASE}/modes`);
-  if (!response.ok) throw new Error('Failed to fetch modes');
-  return (await response.json()).modes;
+export async function getPsetsTemplates() {
+  const response = await fetch(`${API_BASE}/psets_template?enabled=1`);
+  if (!response.ok) throw new Error('Failed to fetch psets templates');
+  return (await response.json()).templates;
 }
 
-export async function getMode(id: number) {
-  const response = await fetch(`${API_BASE}/modes/${id}`);
-  if (!response.ok) throw new Error('Failed to fetch mode');
-  return (await response.json()).mode;
+export async function getPsetsTemplate(id: number) {
+  const response = await fetch(`${API_BASE}/psets_template/${id}`);
+  if (!response.ok) throw new Error('Failed to fetch psets template');
+  return (await response.json()).template;
 }
 
-export async function createMode(data: {
-  displayName: string;
-  description?: string;
-  icon?: string;
-  systemPrompt?: string;
+export async function createPsetsTemplate(data: {
+  visibility: 'public' | 'private';
+  sort_order?: number;
+  psets_name: string;
+  icon?: string | null;
+  description?: string | null;
+  model?: string | null;
+  system_prompt?: string | null;
+  max_tokens?: number | null;
+  context_messages?: number | null;
+  temperature?: number | null;
+  top_p?: number | null;
 }) {
-  const response = await authFetch(`${API_BASE}/modes`, {
+  const response = await authFetch(`${API_BASE}/psets_template`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'Failed to create mode');
+    throw new Error(error.error || 'Failed to create psets template');
   }
-  return (await response.json()).mode;
+  return (await response.json()).template;
 }
 
-export async function updateMode(
-  id: number,
-  data: {
-    displayName?: string;
-    description?: string;
-    icon?: string;
-    systemPrompt?: string;
-  }
-) {
-  const response = await authFetch(`${API_BASE}/modes/${id}`, {
+export async function updatePsetsTemplate(id: number, data: {
+  visibility?: 'public' | 'private';
+  sort_order?: number;
+  psets_name?: string;
+  icon?: string | null;
+  description?: string | null;
+  model?: string | null;
+  system_prompt?: string | null;
+  max_tokens?: number | null;
+  context_messages?: number | null;
+  temperature?: number | null;
+  top_p?: number | null;
+  enabled?: number;
+}) {
+  const response = await authFetch(`${API_BASE}/psets_template/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'Failed to update mode');
+    throw new Error(error.error || 'Failed to update psets template');
   }
-  return (await response.json()).mode;
+  return (await response.json()).template;
 }
 
-export async function deleteMode(id: number) {
-  const response = await authFetch(`${API_BASE}/modes/${id}`, {
+export async function disablePsetsTemplate(id: number) {
+  const response = await authFetch(`${API_BASE}/psets_template/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'Failed to delete mode');
+    throw new Error(error.error || 'Failed to disable psets template');
+  }
+}
+
+export async function copyPsetsTemplate(id: number) {
+  const response = await authFetch(`${API_BASE}/psets_template/${id}/copy`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to copy psets template');
+  }
+  return (await response.json()).template;
+}
+
+export async function updatePsetsTemplateSortOrder(orders: { id: number; sort_order: number }[]) {
+  const response = await authFetch(`${API_BASE}/psets_template/sort_order/bulk`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orders }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update sort order');
   }
 }
 
@@ -217,11 +252,11 @@ export async function getSessions() {
   return (await response.json()).sessions;
 }
 
-export async function createSession(model: string, modeId?: number, projectPath?: string) {
+export async function createSession(templateId: number, projectPath?: string) {
   const response = await authFetch(`${API_BASE}/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, modeId, projectPath }),
+    body: JSON.stringify({ templateId, projectPath }),
   });
   if (!response.ok) throw new Error('Failed to create session');
   return await response.json();
@@ -250,23 +285,45 @@ export async function updateSessionTitle(id: number, title: string) {
   return await response.json();
 }
 
+export async function getSessionPsets(id: number) {
+  const response = await authFetch(`${API_BASE}/sessions/${id}/psets`);
+  if (!response.ok) throw new Error('Failed to fetch session psets');
+  return (await response.json()).psets_current;
+}
+
+export async function updateSessionPsets(id: number, data: {
+  psets_name?: string;
+  icon?: string | null;
+  description?: string | null;
+  model?: string | null;
+  system_prompt?: string | null;
+  max_tokens?: number | null;
+  context_messages?: number | null;
+  temperature?: number | null;
+  top_p?: number | null;
+  template_id?: number | null;
+  template_version?: number | null;
+}) {
+  const response = await authFetch(`${API_BASE}/sessions/${id}/psets`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to update session psets');
+  return (await response.json()).psets_current;
+}
+
 export async function exportSession(id: number): Promise<{ blob: Blob; filename: string }> {
   const response = await authFetch(`${API_BASE}/sessions/${id}/export`);
   if (!response.ok) throw new Error('Failed to export session');
   
-  // レスポンスからファイル名を取得
   const contentDisposition = response.headers.get('Content-Disposition');
-  console.log('Content-Disposition:', contentDisposition);
   let filename = `llamune_chat_${id}.json`;
   if (contentDisposition) {
-    // RFC 5987形式（filename*=UTF-8''...）をパース
     const rfc5987Matches = /filename\*=UTF-8''([^;\s]+)/.exec(contentDisposition);
-    console.log('RFC 5987 matches:', rfc5987Matches);
     if (rfc5987Matches && rfc5987Matches[1]) {
       filename = decodeURIComponent(rfc5987Matches[1]);
-      console.log('Decoded filename:', filename);
     } else {
-      // 通常形式（filename="..."）をパース
       const matches = /filename="([^"]+)"/.exec(contentDisposition);
       if (matches && matches[1]) {
         filename = matches[1];
@@ -321,7 +378,6 @@ export async function* sendMessage(
           
           try {
             const parsed = JSON.parse(data);
-            // サーバーから累積されたcontentが来るので、そのまま渡す
             yield {
               content: parsed.content || '',
               thinking: parsed.thinking,
@@ -419,13 +475,6 @@ export async function rejectRetry(sessionId: number): Promise<boolean> {
   return data.success;
 }
 
-/**
- * 複数のリトライ回答から選択
- * @param sessionId セッションID
- * @param adoptedIndex 採用する回答のインデックス
- * @param keepIndices 履歴に残す回答のインデックス配列
- * @param discardIndices 破棄する回答のインデックス配列
- */
 export async function selectRetry(
   sessionId: number,
   adoptedIndex: number,

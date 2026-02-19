@@ -21,7 +21,8 @@ const router = Router();
  */
 router.get('/', (req, res: Response) => {
   try {
-    const templates = getAllPsetsTemplates();
+    const enabledOnly = req.query.enabled !== undefined ? req.query.enabled === "1" : false;
+    const templates = enabledOnly ? getAllPsetsTemplates().filter(t => t.enabled === 1) : getAllPsetsTemplates();
     res.json({ templates });
   } catch (error) {
     console.error('Get psets_templates error:', error);

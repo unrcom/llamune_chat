@@ -6,10 +6,10 @@ import { useState } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { Login } from './components/Login';
 import { Chat } from './components/Chat';
-import { ModesManagement } from './components/ModesManagement';
+import { ParameterSetsManagement } from './components/ParameterSetsManagement';
 import './App.css';
 
-type Page = 'chat' | 'modes';
+type Page = 'chat' | 'psets';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -30,8 +30,8 @@ function AppContent() {
 
   return (
     <>
-      {currentPage === 'chat' && <Chat onNavigateToModes={() => setCurrentPage('modes')} />}
-      {currentPage === 'modes' && <ModesManagement onNavigateToChat={() => setCurrentPage('chat')} />}
+      {currentPage === 'chat' && <Chat onNavigateToModes={() => setCurrentPage('psets')} />}
+      {currentPage === 'psets' && <ParameterSetsManagement onNavigateToChat={() => setCurrentPage('chat')} />}
     </>
   );
 }

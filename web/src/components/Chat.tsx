@@ -6,8 +6,9 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../hooks/useAuth';
-import type { Mode, Model, Session, Message, ImportedSession } from '../types';
+import type { PsetsTemplate, Model, Session, Message, ImportedSession, PsetsCurrent } from '../types';
 import * as api from '../api/client';
+import { SessionEditModal } from './SessionEditModal';
 import './Chat.css';
 
 /**
@@ -49,28 +50,23 @@ function LoadingIndicator({ message = '回答を生成中...' }: { message?: str
 /**
  * システムプロンプト折りたたみコンポーネント
  */
-function SystemPromptBlock({ 
+function SystemPromptBlock({
   systemPrompt,
-  modeIcon,
-  modeDisplayName,
+  psetsIcon,
+  psetsName,
   model,
-}: { 
+}: {
   systemPrompt: string;
-  modeIcon?: string;
-  modeDisplayName?: string;
+  psetsIcon?: string;
+  psetsName?: string;
   model?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // ヘッダーテキストを構築
   const headerParts: string[] = [];
-  if (modeIcon) headerParts.push(modeIcon);
-  if (modeDisplayName) headerParts.push(modeDisplayName);
+  if (psetsIcon) headerParts.push(psetsIcon);
+  if (psetsName) headerParts.push(psetsName);
   if (model) headerParts.push(`(${model})`);
-  
-  const headerText = headerParts.length > 0 
-    ? `${headerParts.join(' ')} のシステムプロンプト`
-    : '📋 システムプロンプト';
 
   return (
     <div className="system-prompt-block">
@@ -78,12 +74,15 @@ function SystemPromptBlock({
         className="system-prompt-toggle"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="system-prompt-icon">{isOpen ? '▼' : '▶'}</span>
-        <span>{headerText}</span>
+        <span className="thinking-icon">{isOpen ? '▼' : '▶'}</span>
+        <span>
+          システムプロンプト
+          {headerParts.length > 0 && ` — ${headerParts.join(' ')}`}
+        </span>
       </button>
       {isOpen && (
         <div className="system-prompt-content">
-          {systemPrompt}
+          <pre>{systemPrompt}</pre>
         </div>
       )}
     </div>
@@ -91,7 +90,7 @@ function SystemPromptBlock({
 }
 
 /**
- * リトライモーダル（モデル選択）
+ * リトライモーダルコンポーネント
  */
 function RetryModal({
   isOpen,
@@ -111,9 +110,8 @@ function RetryModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal retry-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>🔄 別のモデルで再生成</h3>
-        <p className="retry-description">モデルを選択してください</p>
-        
+        <h3>🔄 別のモデルで再試行</h3>
+        <p>使用するモデルを選択してください</p>
         <div className="model-list">
           {models.map((model) => (
             <button
@@ -130,7 +128,6 @@ function RetryModal({
             </button>
           ))}
         </div>
-
         <div className="modal-actions">
           <button onClick={onClose}>キャンセル</button>
         </div>
@@ -140,53 +137,96 @@ function RetryModal({
 }
 
 /**
- * ディレクトリツリーアイテム
+ * 回答選択コンポーネント（リトライ比較）
  */
-function DirectoryItem({
-  node,
-  onExpand,
-  onSelect,
-  selectedPath,
-  expandedPaths,
+function AnswerSelector({
+  candidates,
+  onConfirm,
+  onRetryMore,
+  isRetrying,
+  maxCandidates,
 }: {
-  node: api.DirectoryNode;
-  onExpand: (path: string) => void;
-  onSelect: (path: string) => void;
-  selectedPath: string | null;
-  expandedPaths: Set<string>;
+  candidates: Message[];
+  onConfirm: (adoptedIndex: number, keepIndices: number[], discardIndices: number[]) => void;
+  onRetryMore: () => void;
+  isRetrying: boolean;
+  maxCandidates: number;
 }) {
-  const isExpanded = expandedPaths.has(node.path);
-  const isSelected = selectedPath === node.path;
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [keepIndices, setKeepIndices] = useState<number[]>([]);
 
-  const handleClick = () => {
-    if (isExpanded) {
-      onSelect(node.path);
-    } else {
-      onExpand(node.path);
-    }
+  const toggleKeep = (index: number) => {
+    if (index === selectedIndex) return;
+    setKeepIndices((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+    );
+  };
+
+  const handleConfirm = () => {
+    const allIndices = candidates.map((_, i) => i);
+    const discardIndices = allIndices.filter(
+      (i) => i !== selectedIndex && !keepIndices.includes(i)
+    );
+    onConfirm(selectedIndex, keepIndices, discardIndices);
   };
 
   return (
-    <div className="directory-item-wrapper">
-      <div
-        className={`directory-item ${isSelected ? 'selected' : ''}`}
-        onClick={handleClick}
-      >
-        <span className="directory-icon">{isExpanded ? '📂' : '📁'}</span>
-        <span className="directory-name">{node.name}</span>
+    <div className="answer-selector">
+      <div className="answer-selector-header">
+        <span>🔄 回答を比較中 ({candidates.length}/{maxCandidates})</span>
+        {!isRetrying && candidates.length < maxCandidates && (
+          <button className="retry-more-btn" onClick={onRetryMore}>
+            + さらにリトライ
+          </button>
+        )}
       </div>
-      {isExpanded && node.children && node.children.length > 0 && (
-        <div className="directory-children">
-          {node.children.map((child) => (
-            <DirectoryItem
-              key={child.path}
-              node={child}
-              onExpand={onExpand}
-              onSelect={onSelect}
-              selectedPath={selectedPath}
-              expandedPaths={expandedPaths}
-            />
-          ))}
+      <div className="answer-tabs">
+        {candidates.map((candidate, i) => (
+          <div
+            key={i}
+            className={`answer-tab ${i === selectedIndex ? 'selected' : ''} ${
+              keepIndices.includes(i) ? 'kept' : ''
+            }`}
+          >
+            <div className="answer-tab-header">
+              <button
+                className="answer-tab-select"
+                onClick={() => setSelectedIndex(i)}
+              >
+                {i === selectedIndex ? '✅' : '○'} 回答 {i + 1}
+              </button>
+              {candidate.model && (
+                <span className="answer-model">{candidate.model}</span>
+              )}
+              {i !== selectedIndex && (
+                <button
+                  className={`keep-btn ${keepIndices.includes(i) ? 'active' : ''}`}
+                  onClick={() => toggleKeep(i)}
+                  title="履歴に残す"
+                >
+                  📋
+                </button>
+              )}
+            </div>
+            {i === selectedIndex && (
+              <div className="answer-content markdown-body">
+                {candidate.thinking && <ThinkingBlock thinking={candidate.thinking} />}
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{candidate.content}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {isRetrying && (
+        <div className="answer-streaming">
+          <LoadingIndicator message="別のモデルで回答を生成中..." />
+        </div>
+      )}
+      {!isRetrying && (
+        <div className="answer-selector-actions">
+          <button className="btn-primary" onClick={handleConfirm}>
+            ✅ 選択した回答を採用
+          </button>
         </div>
       )}
     </div>
@@ -194,7 +234,7 @@ function DirectoryItem({
 }
 
 /**
- * ディレクトリ選択モーダル
+ * ディレクトリツリーモーダルコンポーネント
  */
 function DirectoryTreeModal({
   isOpen,
@@ -205,80 +245,25 @@ function DirectoryTreeModal({
   onClose: () => void;
   onSelect: (path: string) => void;
 }) {
-  const [rootNode, setRootNode] = useState<api.DirectoryNode | null>(null);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [tree, setTree] = useState<api.DirectoryNode | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState<string | undefined>(undefined);
 
-  // 初期ロード
   useEffect(() => {
-    if (isOpen && !rootNode) {
-      loadDirectory();
+    if (isOpen) {
+      loadTree(currentPath);
     }
-  }, [isOpen]);
+  }, [isOpen, currentPath]);
 
-  const loadDirectory = async (path?: string) => {
+  const loadTree = async (path?: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
       const data = await api.getDirectoryTree(path);
-
-      if (path) {
-        setRootNode((prevRoot) => {
-          if (!prevRoot) return data;
-          return updateNodeChildren(prevRoot, path, data.children || []);
-        });
-      } else {
-        setRootNode(data);
-        setExpandedPaths(new Set([data.path]));
-      }
+      setTree(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'エラーが発生しました');
+      console.error('Failed to load directory tree:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateNodeChildren = (
-    node: api.DirectoryNode,
-    targetPath: string,
-    children: api.DirectoryNode[]
-  ): api.DirectoryNode => {
-    if (node.path === targetPath) {
-      return { ...node, children };
-    }
-    if (node.children) {
-      return {
-        ...node,
-        children: node.children.map((child) =>
-          updateNodeChildren(child, targetPath, children)
-        ),
-      };
-    }
-    return node;
-  };
-
-  const handleExpand = async (path: string) => {
-    const newExpandedPaths = new Set(expandedPaths);
-    if (newExpandedPaths.has(path)) {
-      newExpandedPaths.delete(path);
-      setExpandedPaths(newExpandedPaths);
-    } else {
-      newExpandedPaths.add(path);
-      setExpandedPaths(newExpandedPaths);
-      await loadDirectory(path);
-    }
-  };
-
-  const handleSelect = (path: string) => {
-    setSelectedPath(path);
-  };
-
-  const handleConfirm = () => {
-    if (selectedPath) {
-      onSelect(selectedPath);
-      onClose();
     }
   };
 
@@ -288,227 +273,102 @@ function DirectoryTreeModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal directory-modal" onClick={(e) => e.stopPropagation()}>
         <h3>📁 プロジェクトフォルダを選択</h3>
-
-        <div className="directory-tree">
-          {loading && !rootNode && (
-            <div className="directory-loading">読み込み中...</div>
-          )}
-          {error && (
-            <div className="directory-error">{error}</div>
-          )}
-          {rootNode && (
-            <DirectoryItem
-              node={rootNode}
-              onExpand={handleExpand}
-              onSelect={handleSelect}
-              selectedPath={selectedPath}
-              expandedPaths={expandedPaths}
+        {loading ? (
+          <LoadingIndicator message="ディレクトリを読み込み中..." />
+        ) : tree ? (
+          <div className="directory-tree">
+            <DirectoryNode
+              node={tree}
+              onSelectDirectory={(path) => {
+                onSelect(path);
+                onClose();
+              }}
+              onNavigate={(path) => setCurrentPath(path)}
             />
-          )}
-        </div>
-
-        {selectedPath && (
-          <div className="directory-selected">
-            <span className="directory-selected-label">選択中:</span>
-            <span className="directory-selected-path">{selectedPath}</span>
           </div>
-        )}
-
+        ) : null}
         <div className="modal-actions">
           <button onClick={onClose}>キャンセル</button>
-          <button 
-            onClick={handleConfirm} 
-            className="primary"
-            disabled={!selectedPath}
-          >
-            選択
-          </button>
         </div>
       </div>
     </div>
   );
 }
 
-/**
- * 回答の選択状態
- */
-type AnswerAction = 'adopt' | 'keep' | 'discard' | null;
-
-/**
- * 回答選択コンポーネント（複数回答スタック対応・3択）
- */
-function AnswerSelector({
-  candidates,
-  onConfirm,
-  onRetryMore,
-  isRetrying,
-  maxCandidates = 8,
+function DirectoryNode({
+  node,
+  onSelectDirectory,
+  onNavigate,
+  depth = 0,
 }: {
-  candidates: Message[];
-  onConfirm: (adoptedIndex: number, keepIndices: number[], discardIndices: number[]) => void;
-  onRetryMore: () => void;
-  isRetrying: boolean;
-  maxCandidates?: number;
+  node: api.DirectoryNode;
+  onSelectDirectory: (path: string) => void;
+  onNavigate: (path: string) => void;
+  depth?: number;
 }) {
-  // 各候補の選択状態を管理
-  const [actions, setActions] = useState<AnswerAction[]>(() => 
-    candidates.map(() => null)
-  );
+  const [expanded, setExpanded] = useState(depth === 0);
 
-  // 候補数が変わったらactionsを更新
-  useEffect(() => {
-    setActions(prev => {
-      if (prev.length < candidates.length) {
-        return [...prev, ...Array(candidates.length - prev.length).fill(null)];
-      }
-      return prev.slice(0, candidates.length);
-    });
-  }, [candidates.length]);
-
-  // 採用が1つ選択されているか
-  const hasAdopted = actions.includes('adopt');
-  
-  // 全候補にアクションが設定されているか
-  const allSelected = actions.every(a => a !== null);
-  
-  // 確定可能か
-  const canConfirm = hasAdopted && allSelected && !isRetrying;
-
-  // アクションを設定
-  const setAction = (index: number, action: AnswerAction) => {
-    setActions(prev => {
-      const newActions = [...prev];
-      // 採用は1つだけなので、他の採用を解除
-      if (action === 'adopt') {
-        for (let i = 0; i < newActions.length; i++) {
-          if (newActions[i] === 'adopt') {
-            newActions[i] = null;
-          }
-        }
-      }
-      newActions[index] = action;
-      return newActions;
-    });
-  };
-
-  // 確定処理
-  const handleConfirm = () => {
-    const adoptedIndex = actions.findIndex(a => a === 'adopt');
-    const keepIndices = actions
-      .map((a, i) => a === 'keep' ? i : -1)
-      .filter(i => i !== -1);
-    const discardIndices = actions
-      .map((a, i) => a === 'discard' ? i : -1)
-      .filter(i => i !== -1);
-    
-    onConfirm(adoptedIndex, keepIndices, discardIndices);
-  };
+  if (!node.isDirectory) return null;
 
   return (
-    <div className="answer-selector">
-      <div className="answer-selector-header">
-        <span>💡 各回答のアクションを選択してください（{candidates.length}個の候補）</span>
-        <div className="answer-selector-hint">
-          ※「採用」は1つ必須です
-        </div>
-      </div>
-      <div className="answer-candidates">
-        {candidates.map((candidate, index) => (
-          <div 
-            key={index} 
-            className={`answer-card ${actions[index] || ''} ${index === 0 ? 'original' : 'retry'}`}
-          >
-            <div className="answer-card-header">
-              <span className="answer-label">
-                {index === 0 ? '元の回答' : `回答 ${index + 1}`}
-              </span>
-              {candidate.model && (
-                <span className="answer-model">{candidate.model}</span>
-              )}
-              {actions[index] && (
-                <span className={`answer-status ${actions[index]}`}>
-                  {actions[index] === 'adopt' && '✓ 採用'}
-                  {actions[index] === 'keep' && '📋 履歴に残す'}
-                  {actions[index] === 'discard' && '🗑️ 破棄'}
-                </span>
-              )}
-            </div>
-            {candidate.thinking && (
-              <ThinkingBlock thinking={candidate.thinking} />
-            )}
-            <div className="answer-content">
-              {candidate.content}
-            </div>
-            <div className="answer-actions">
-              <button
-                className={`answer-action-btn adopt ${actions[index] === 'adopt' ? 'active' : ''}`}
-                onClick={() => setAction(index, 'adopt')}
-                disabled={isRetrying}
-              >
-                ✓ 採用
-              </button>
-              <button
-                className={`answer-action-btn keep ${actions[index] === 'keep' ? 'active' : ''}`}
-                onClick={() => setAction(index, 'keep')}
-                disabled={isRetrying}
-              >
-                📋 履歴に残す
-              </button>
-              <button
-                className={`answer-action-btn discard ${actions[index] === 'discard' ? 'active' : ''}`}
-                onClick={() => setAction(index, 'discard')}
-                disabled={isRetrying}
-              >
-                🗑️ 破棄
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="answer-selector-footer">
-        {candidates.length < maxCandidates && (
-          <button
-            className="retry-more-btn"
-            onClick={onRetryMore}
-            disabled={isRetrying}
-          >
-            {isRetrying ? '生成中...' : '🔄 別のモデルでもう1つ生成'}
-          </button>
-        )}
+    <div className="dir-node" style={{ paddingLeft: `${depth * 16}px` }}>
+      <div className="dir-item">
         <button
-          className="confirm-btn"
-          onClick={handleConfirm}
-          disabled={!canConfirm}
+          className="dir-expand"
+          onClick={() => setExpanded(!expanded)}
         >
-          決定
+          {expanded ? '▼' : '▶'}
+        </button>
+        <span className="dir-name" onClick={() => onSelectDirectory(node.path)}>
+          📁 {node.name}
+        </span>
+        <button
+          className="dir-select-btn"
+          onClick={() => onSelectDirectory(node.path)}
+        >
+          選択
         </button>
       </div>
+      {expanded && node.children && (
+        <div className="dir-children">
+          {node.children
+            .filter((child) => child.isDirectory)
+            .map((child) => (
+              <DirectoryNode
+                key={child.path}
+                node={child}
+                onSelectDirectory={onSelectDirectory}
+                onNavigate={onNavigate}
+                depth={depth + 1}
+              />
+            ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const { user, logout } = useAuth();
-  const [modes, setModes] = useState<Mode[]>([]);
+  const [psetsTemplates, setPsetsTemplates] = useState<PsetsTemplate[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [sessionModel, setSessionModel] = useState<string | null>(null);
-  const [modeDisplayName, setModeDisplayName] = useState<string | null>(null);
-  const [modeIcon, setModeIcon] = useState<string | null>(null);
+  const [psetsName, setPsetsName] = useState<string | null>(null);
+  const [psetsIcon, setPsetsIcon] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingThinking, setStreamingThinking] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<number | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // 自動スクロール制御
@@ -518,9 +378,9 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
 
-  // セッション編集関連の状態
-  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
+  // セッション編集モーダル関連の状態
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editingSessionPsets, setEditingSessionPsets] = useState<PsetsCurrent | null>(null);
   const [hoverInfoSessionId, setHoverInfoSessionId] = useState<number | null>(null);
 
   // リトライ関連の状態
@@ -536,37 +396,35 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
 
   // 新規セッション作成直後はメッセージ再取得をスキップするフラグ
   const skipFetchMessagesRef = useRef(false);
-  
+
   // セッション切り替え時は自動スクロールをスキップするフラグ
   const skipAutoScrollRef = useRef(false);
 
   // 新規チャット準備状態（DBに未作成）
   const [pendingNewChat, setPendingNewChat] = useState<{
-    model: string;
-    modeId: number;
+    templateId: number;
     projectPath: string | null;
     systemPrompt: string | null;
-    modeDisplayName: string | null;
-    modeIcon: string | null;
+    psetsName: string | null;
+    psetsIcon: string | null;
+    model: string | null;
   } | null>(null);
 
   // 初期データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [modesData, modelsData, sessionsData] = await Promise.all([
-          api.getModes(),
+        const [templatesData, modelsData, sessionsData] = await Promise.all([
+          api.getPsetsTemplates(),
           api.getModels(),
           api.getSessions(),
         ]);
-        setModes(modesData);
+        setPsetsTemplates(templatesData);
         setModels(modelsData);
         setSessions(sessionsData);
-        if (modelsData.length > 0) {
-          setSelectedModel(modelsData[0].name);
-        }
-        if (modesData.length > 0) {
-          setSelectedMode(modesData[0].id);
+        if (templatesData.length > 0) {
+          setSelectedTemplate(templatesData[0].id);
+          setSelectedModel(templatesData[0].model || '');
         }
       } catch (err) {
         console.error('Failed to fetch data:', err);
@@ -577,34 +435,30 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
 
   // セッション選択時にメッセージを取得
   useEffect(() => {
-    // セッション切り替え時にリトライ関連stateをリセット
     setRetryPending(false);
     setAnswerCandidates([]);
     setIsRetrying(false);
     setStreamingContent('');
     setStreamingThinking('');
-    
+
     if (currentSession) {
-      // 新規セッション作成直後はメッセージ再取得をスキップ
       if (skipFetchMessagesRef.current) {
         skipFetchMessagesRef.current = false;
         return;
       }
-      
-      // 既存セッション選択時はpendingNewChatをクリア
+
       setPendingNewChat(null);
-      
+
       const fetchMessages = async () => {
         try {
-          // セッション切り替え時は自動スクロールをスキップし、先頭にスクロール
           skipAutoScrollRef.current = true;
-          
+
           const data = await api.getSession(currentSession);
           setMessages(data.messages || []);
           setSystemPrompt(data.systemPrompt || null);
-          setSessionModel(data.session?.model || null);
-          setModeDisplayName(data.modeDisplayName || null);
-          setModeIcon(data.modeIcon || null);
+          setSessionModel(data.model || null);
+          setPsetsName(data.psetsName || null);
+          setPsetsIcon(data.psetsIcon || null);
         } catch (err) {
           console.error('Failed to fetch messages:', err);
           skipAutoScrollRef.current = false;
@@ -615,24 +469,21 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
       setMessages([]);
       setSystemPrompt(null);
       setSessionModel(null);
-      setModeDisplayName(null);
-      setModeIcon(null);
+      setPsetsName(null);
+      setPsetsIcon(null);
     }
   }, [currentSession]);
 
-  // スクロールイベントハンドラ（ユーザーが手動スクロールしたかを検出）
+  // スクロールイベントハンドラ
   const handleMessagesScroll = () => {
     const container = messagesContainerRef.current;
     if (!container) return;
-    
-    // 最下部から50px以内なら自動スクロール有効、それ以外はユーザーがスクロール中
     const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
     setUserScrolled(!isAtBottom);
   };
 
-  // 自動スクロール（ユーザーが手動スクロール中でなければ実行）
+  // 自動スクロール
   useEffect(() => {
-    // セッション切り替え時は先頭にスクロール
     if (skipAutoScrollRef.current) {
       if (messagesContainerRef.current) {
         messagesContainerRef.current.scrollTop = 0;
@@ -654,39 +505,34 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
 
   // 新しいチャット作成（準備状態にするだけ、DBには作成しない）
   const handleNewChat = async () => {
-    if (!selectedModel || !selectedMode) return;
-    
-    try {
-      // モード情報を取得
-      const modeData = await api.getMode(selectedMode);
-      
-      // 準備状態を設定（DBにはまだ作成しない）
-      setPendingNewChat({
-        model: selectedModel,
-        modeId: selectedMode,
-        projectPath: selectedProjectPath,
-        systemPrompt: modeData.system_prompt || null,
-        modeDisplayName: modeData.display_name || null,
-        modeIcon: modeData.icon || null,
-      });
-      
-      // UIを新規チャット状態に
-      setCurrentSession(null);
-      setMessages([]);
-      setSystemPrompt(modeData.system_prompt || null);
-      setSessionModel(selectedModel);
-      setModeDisplayName(modeData.display_name || null);
-      setModeIcon(modeData.icon || null);
-      setShowNewChat(false);
-      setSelectedProjectPath(null);
-    } catch (err) {
-      console.error('Failed to prepare new chat:', err);
-    }
+    if (!selectedTemplate) return;
+
+    const template = psetsTemplates.find((t) => t.id === selectedTemplate);
+    if (!template) return;
+
+    const modelToUse = template.model || selectedModel || null;
+
+    setPendingNewChat({
+      templateId: selectedTemplate,
+      projectPath: selectedProjectPath,
+      systemPrompt: template.system_prompt || null,
+      psetsName: template.psets_name,
+      psetsIcon: template.icon || null,
+      model: modelToUse,
+    });
+
+    setCurrentSession(null);
+    setMessages([]);
+    setSystemPrompt(template.system_prompt || null);
+    setSessionModel(template.model || selectedModel || null);
+    setPsetsName(template.psets_name);
+    setPsetsIcon(template.icon || null);
+    setShowNewChat(false);
+    setSelectedProjectPath(null);
   };
 
   // メッセージ送信
   const handleSend = async () => {
-    // pendingNewChatがある場合、またはcurrentSessionがある場合に送信可能
     if (!input.trim() || loading) return;
     if (!currentSession && !pendingNewChat) return;
 
@@ -696,27 +542,22 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setStreamingContent('');
     setStreamingThinking('');
 
-    // AbortControllerを作成
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // ユーザーメッセージを追加
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
-      // 新規チャットの場合、まずセッションを作成
       let sessionId = currentSession;
       if (!sessionId && pendingNewChat) {
         const data = await api.createSession(
-          pendingNewChat.model,
-          pendingNewChat.modeId,
+          pendingNewChat.templateId,
           pendingNewChat.projectPath || undefined
         );
         sessionId = data.session.id;
-        // 新規作成直後はuseEffectでのメッセージ再取得をスキップ
         skipFetchMessagesRef.current = true;
         setCurrentSession(sessionId);
-        setPendingNewChat(null); // 準備状態をクリア
+        setPendingNewChat(null);
       }
 
       if (!sessionId) {
@@ -732,25 +573,21 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
         setStreamingThinking(chunk.thinking || '');
       }
 
-      // ストリーミング完了後、アシスタントメッセージを追加
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
+      setMessages(prev => [...prev, {
+        role: 'assistant',
         content: fullContent,
         thinking: fullThinking || undefined,
       }]);
       setStreamingContent('');
       setStreamingThinking('');
 
-      // セッション一覧を更新
       const sessionsData = await api.getSessions();
       setSessions(sessionsData);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         console.log('Message sending cancelled by user');
-        // キャンセル時は最後のユーザーメッセージを削除して入力欄に戻す
         setMessages(prev => {
           const newMessages = [...prev];
-          // 最後のユーザーメッセージを探して削除
           for (let i = newMessages.length - 1; i >= 0; i--) {
             if (newMessages[i].role === 'user') {
               newMessages.splice(i, 1);
@@ -783,7 +620,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const handleDeleteSession = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('このセッションを削除しますか？')) return;
-    
+
     try {
       await api.deleteSession(id);
       setSessions(prev => prev.filter(s => s.id !== id));
@@ -799,7 +636,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   // セッションエクスポート
   const handleExportSession = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     try {
       const { blob, filename } = await api.exportSession(id);
       const url = window.URL.createObjectURL(blob);
@@ -830,19 +667,16 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
       const text = await file.text();
       const data = JSON.parse(text) as ImportedSession;
 
-      // 簡易バリデーション
       if (!data.session || !data.messages) {
         throw new Error('Invalid file format');
       }
 
-      // インポートデータを設定（閲覧モードに入る）
       setImportedData(data);
-      setCurrentSession(null); // 通常セッションの選択を解除
+      setCurrentSession(null);
     } catch (err) {
       console.error('Failed to import:', err);
       alert('インポートに失敗しました。ファイル形式を確認してください。');
     } finally {
-      // ファイル入力をリセット（同じファイルを再選択できるように）
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -854,44 +688,53 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setImportedData(null);
   };
 
-  // セッションタイトル編集開始
-  const startEditingTitle = (session: Session, e: React.MouseEvent) => {
+  // セッション編集モーダルを開く
+  const openSessionEditModal = async (session: Session, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingSessionId(session.id);
-    setEditingTitle(session.title || '');
-    setTimeout(() => editInputRef.current?.focus(), 0);
-  };
-
-  // セッションタイトル保存
-  const saveSessionTitle = async () => {
-    if (editingSessionId === null) return;
-
     try {
-      await api.updateSessionTitle(editingSessionId, editingTitle);
-      setSessions(prev => prev.map(s =>
-        s.id === editingSessionId ? { ...s, title: editingTitle } : s
-      ));
+      const psets = await api.getSessionPsets(session.id);
+      setEditingSession(session);
+      setEditingSessionPsets(psets);
     } catch (err) {
-      console.error('Failed to update title:', err);
-    } finally {
-      setEditingSessionId(null);
-      setEditingTitle('');
+      console.error('Failed to fetch session psets:', err);
     }
   };
 
-  // タイトル編集キャンセル
-  const cancelEditingTitle = () => {
-    setEditingSessionId(null);
-    setEditingTitle('');
-  };
+  // セッション編集を保存
+  const handleSessionEditSave = async (title: string, psets: {
+    psets_name: string;
+    icon: string | null;
+    description: string | null;
+    model: string | null;
+    system_prompt: string | null;
+    max_tokens: number | null;
+    context_messages: number | null;
+    temperature: number | null;
+    top_p: number | null;
+    template_id: number | null;
+    template_version: number | null;
+  }) => {
+    if (!editingSession) return;
+    try {
+      await api.updateSessionTitle(editingSession.id, title);
+      await api.updateSessionPsets(editingSession.id, psets);
 
-  // タイトル編集キー操作
-  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveSessionTitle();
-    } else if (e.key === 'Escape') {
-      cancelEditingTitle();
+      // セッション一覧を更新
+      const sessionsData = await api.getSessions();
+      setSessions(sessionsData);
+
+      // 現在開いているセッションなら表示も更新
+      if (currentSession === editingSession.id) {
+        setSystemPrompt(psets.system_prompt);
+        setSessionModel(psets.model);
+        setPsetsName(psets.psets_name);
+        setPsetsIcon(psets.icon);
+      }
+
+      setEditingSession(null);
+      setEditingSessionPsets(null);
+    } catch (err) {
+      console.error('Failed to save session edit:', err);
     }
   };
 
@@ -904,11 +747,10 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     return `${year}-${month}-${day}`;
   };
 
-  // リトライ実行（初回または追加）
+  // リトライ実行
   const handleRetry = async (model: string) => {
     if (!currentSession || isRetrying) return;
 
-    // 初回リトライの場合、元の回答を候補に追加
     if (answerCandidates.length === 0) {
       const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
       if (!lastAssistant) return;
@@ -919,7 +761,6 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setStreamingContent('');
     setStreamingThinking('');
 
-    // AbortControllerを作成
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -936,7 +777,6 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
         setStreamingThinking(chunk.thinking || '');
       }
 
-      // 新しい回答を候補に追加
       const newAnswer: Message = {
         role: 'assistant',
         content: fullContent,
@@ -953,7 +793,6 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
       } else {
         console.error('Failed to retry:', err);
       }
-      // キャンセル時、候補が1つしかない場合はリセット
       if (answerCandidates.length <= 1) {
         setAnswerCandidates([]);
         setRetryPending(false);
@@ -973,23 +812,20 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
 
   // 回答選択を確定
   const handleConfirmSelection = async (
-    adoptedIndex: number, 
-    keepIndices: number[], 
+    adoptedIndex: number,
+    keepIndices: number[],
     discardIndices: number[]
   ) => {
     if (!currentSession || answerCandidates.length === 0) return;
 
     const adoptedAnswer = answerCandidates[adoptedIndex];
     const keptAnswers = keepIndices.map(i => answerCandidates[i]);
-    
+
     try {
-      // 新しいAPIを呼び出し
       await api.selectRetry(currentSession, adoptedIndex, keepIndices, discardIndices);
-      
-      // メッセージを更新
+
       setMessages(prev => {
         const newMessages = [...prev];
-        // 最後のアシスタントメッセージを探す
         let lastAssistantIdx = -1;
         for (let i = newMessages.length - 1; i >= 0; i--) {
           if (newMessages[i].role === 'assistant') {
@@ -997,25 +833,19 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             break;
           }
         }
-        
+
         if (lastAssistantIdx !== -1) {
-          // 採用した回答で置き換え
           newMessages[lastAssistantIdx] = { ...adoptedAnswer, is_adopted: true };
-          
-          // 履歴に残す回答を追加（is_adopted: false）
           const keptMessages = keptAnswers.map(answer => ({
             ...answer,
             is_adopted: false,
           }));
-          
-          // 採用した回答の後に履歴に残す回答を挿入
           newMessages.splice(lastAssistantIdx + 1, 0, ...keptMessages);
         }
-        
+
         return newMessages;
       });
 
-      // 状態をリセット
       setRetryPending(false);
       setAnswerCandidates([]);
     } catch (err) {
@@ -1035,7 +865,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
       <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <div className="sidebar-header-top">
-            <button 
+            <button
               className="sidebar-toggle-btn"
               onClick={() => setIsSidebarOpen(false)}
               title="サイドバーを閉じる"
@@ -1048,7 +878,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             + 新しいチャット
           </button>
           <button className="modes-btn" onClick={onNavigateToModes}>
-            ⚙️ モード管理
+            ⚙️ パラメータセット管理
           </button>
           <button className="import-btn" onClick={handleImportClick}>
             📤 インポート
@@ -1067,33 +897,21 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             <div
               key={session.id}
               className={`session-item ${currentSession === session.id ? 'active' : ''}`}
-              onClick={() => editingSessionId !== session.id && setCurrentSession(session.id)}
+              onClick={() => setCurrentSession(session.id)}
             >
-              {editingSessionId === session.id ? (
-                <div className="session-edit">
-                  <input
-                    ref={editInputRef}
-                    type="text"
-                    value={editingTitle}
-                    onChange={(e) => setEditingTitle(e.target.value)}
-                    onKeyDown={handleTitleKeyDown}
-                    onBlur={saveSessionTitle}
-                    className="session-edit-input"
-                  />
-                </div>
-              ) : (
-                <>
-                  <div
-                    className="session-info-wrapper"
-                    onMouseEnter={() => setHoverInfoSessionId(session.id)}
-                    onMouseLeave={() => setHoverInfoSessionId(null)}
+              <>
+                <div className="session-info-row">
+                  <button
+                    className="session-info-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHoverInfoSessionId(
+                        hoverInfoSessionId === session.id ? null : session.id
+                      );
+                    }}
                   >
-                    <button
-                      className="session-action-btn info-btn"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      ℹ️
-                    </button>
+                    ℹ️
+                  </button>
                     {hoverInfoSessionId === session.id && (
                       <div className="session-info-tooltip">
                         <div className="tooltip-row">
@@ -1101,8 +919,8 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                           <span>{session.created_at ? formatDate(session.created_at) : '(不明)'}</span>
                         </div>
                         <div className="tooltip-row">
-                          <span className="tooltip-label">🎯 モード:</span>
-                          <span>{session.mode_icon || ''} {session.mode_display_name || '(なし)'}</span>
+                          <span className="tooltip-label">🎯 パラメータセット:</span>
+                          <span>{session.psets_icon || ''} {session.psets_name || '(なし)'}</span>
                         </div>
                         <div className="tooltip-row">
                           <span className="tooltip-label">🤖 LLM:</span>
@@ -1133,8 +951,8 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                     </button>
                     <button
                       className="session-action-btn edit-btn"
-                      onClick={(e) => startEditingTitle(session, e)}
-                      title="タイトル編集"
+                      onClick={(e) => openSessionEditModal(session, e)}
+                      title="編集"
                     >
                       ✏️
                     </button>
@@ -1147,9 +965,8 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                     </button>
                   </div>
                 </>
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
         </div>
 
         <div className="sidebar-footer">
@@ -1162,9 +979,8 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
 
       {/* メインエリア */}
       <main className="main-area">
-        {/* サイドバーが閉じている時の開くボタン */}
         {!isSidebarOpen && (
-          <button 
+          <button
             className="sidebar-open-btn"
             onClick={() => setIsSidebarOpen(true)}
             title="サイドバーを開く"
@@ -1172,7 +988,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             ☰
           </button>
         )}
-        
+
         {/* インポート閲覧モード */}
         {importedData ? (
           <>
@@ -1190,7 +1006,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             </div>
             <div className="messages">
               {importedData.session.systemPrompt && (
-                <SystemPromptBlock 
+                <SystemPromptBlock
                   systemPrompt={importedData.session.systemPrompt}
                   model={importedData.session.model}
                 />
@@ -1201,12 +1017,11 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                   <div key={i} className={`message ${msg.role} ${isKeptOnly ? 'kept-only' : ''}`}>
                     <div className="message-header">
                       <div className="message-role">
-                        {msg.role === 'user' ? '👤 You' : '🤖 AI'}
-                        {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
-                      </div>
-                      {msg.model && msg.role === 'assistant' && (
-                        <span className="message-model">{msg.model}</span>
+                        {msg.role === 'user' ? '👤 You' : (
+                        <>🤖 AI{msg.model && <span className="message-model-inline"> {msg.model}</span>}</>
                       )}
+                      {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
+                      </div>
                     </div>
                     {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
                     <div className="message-content markdown-body">
@@ -1220,22 +1035,20 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           </>
         ) : (currentSession || pendingNewChat) ? (
           <>
-            <div 
+            <div
               className="messages"
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
             >
               {systemPrompt && (
-                <SystemPromptBlock 
+                <SystemPromptBlock
                   systemPrompt={systemPrompt}
-                  modeIcon={modeIcon || undefined}
-                  modeDisplayName={modeDisplayName || undefined}
+                  psetsIcon={psetsIcon || undefined}
+                  psetsName={psetsName || undefined}
                   model={sessionModel || undefined}
                 />
               )}
-              {/* リトライ比較中は最後のアシスタントメッセージを非表示 */}
               {messages.map((msg, i) => {
-                // リトライ比較中は最後のアシスタントメッセージをスキップ
                 if (retryPending && i === lastAssistantIndex && msg.role === 'assistant') {
                   return null;
                 }
@@ -1247,18 +1060,16 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                   <div key={i} className={`message ${msg.role} ${isKeptOnly ? 'kept-only' : ''}`}>
                     <div className="message-header">
                       <div className="message-role">
-                        {msg.role === 'user' ? '👤 You' : '🤖 AI'}
-                        {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
-                      </div>
-                      {msg.model && msg.role === 'assistant' && (
-                        <span className="message-model">{msg.model}</span>
+                        {msg.role === 'user' ? '👤 You' : (
+                        <>🤖 AI{msg.model && <span className="message-model-inline"> {msg.model}</span>}</>
                       )}
+                      {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
+                      </div>
                     </div>
                     {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
                     <div className="message-content markdown-body">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                     </div>
-                    {/* 最後のアシスタントメッセージにリトライボタン */}
                     {isLastAssistant && !loading && !isRetrying && !retryPending && (
                       <button
                         className="retry-btn"
@@ -1347,39 +1158,46 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
         <div className="modal-overlay" onClick={() => setShowNewChat(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>新しいチャット</h3>
-            
+
             <div className="form-group">
-              <label>モード</label>
+              <label>パラメータセット</label>
               <select
-                value={selectedMode || ''}
-                onChange={(e) => setSelectedMode(Number(e.target.value))}
+                value={selectedTemplate || ''}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  setSelectedTemplate(id);
+                  const tmpl = psetsTemplates.find(t => t.id === id);
+                  setSelectedModel(tmpl?.model || '');
+                }}
               >
-                {modes.map(mode => (
-                  <option key={mode.id} value={mode.id}>
-                    {mode.icon} {mode.display_name}
+                {psetsTemplates.map(template => (
+                  <option key={template.id} value={template.id}>
+                    {template.icon} {template.psets_name}
+                    {template.model ? ` — ${template.model}` : ''}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="form-group">
-              <label>モデル</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-              >
-                {models.map(model => (
-                  <option key={model.name} value={model.name}>
-                    {model.name} ({model.sizeFormatted})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* プロジェクトフォルダ - 「あなたの本職を支援」モードの時のみ表示 */}
-            {modes.find(m => m.id === selectedMode)?.display_name === 'あなたの本職を支援' && (
+            {/* テンプレートにモデル未設定の場合はモデル選択を表示 */}
+            {!psetsTemplates.find(t => t.id === selectedTemplate)?.model && (
               <div className="form-group">
-                <label>プロジェクトフォルダ（オプション）</label>
+                <label>モデル <span style={{color:'red'}}>*</span></label>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                >
+                  <option value="">モデルを選択してください</option>
+                  {models.map(m => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* プロジェクトフォルダ選択 */}
+            <div className="form-group">
+              <label>プロジェクトフォルダ（オプション）</label>
               <div className="project-path-selector">
                 <input
                   type="text"
@@ -1388,7 +1206,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                   placeholder="フォルダを選択..."
                   className="project-path-input"
                 />
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowDirectoryModal(true)}
                   className="browse-btn"
@@ -1396,7 +1214,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                   📁 参照
                 </button>
                 {selectedProjectPath && (
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setSelectedProjectPath(null)}
                     className="clear-btn"
@@ -1406,14 +1224,23 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                 )}
               </div>
             </div>
-            )}
 
             <div className="modal-actions">
               <button onClick={() => { setShowNewChat(false); setSelectedProjectPath(null); }}>キャンセル</button>
-              <button onClick={handleNewChat} className="primary">開始</button>
+              <button onClick={handleNewChat} className="primary" disabled={!psetsTemplates.find(t => t.id === selectedTemplate)?.model && !selectedModel}>開始</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* セッション編集モーダル */}
+      {editingSession && (
+        <SessionEditModal
+          session={editingSession}
+          currentPsets={editingSessionPsets}
+          onClose={() => { setEditingSession(null); setEditingSessionPsets(null); }}
+          onSave={handleSessionEditSave}
+        />
       )}
 
       {/* ディレクトリ選択モーダル */}
@@ -1428,7 +1255,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
         isOpen={showRetryModal}
         onClose={() => setShowRetryModal(false)}
         models={models}
-        currentModel={selectedModel}
+        currentModel={sessionModel || ''}
         onRetry={handleRetry}
       />
     </div>

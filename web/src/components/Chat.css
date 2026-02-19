@@ -1311,3 +1311,11 @@
   width: 16px;
   height: 16px;
 }
+
+/* メッセージのインラインモデル表示 */
+.message-model-inline {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: normal;
+  margin-left: 0.4rem;
+}

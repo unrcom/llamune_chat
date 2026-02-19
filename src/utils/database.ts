@@ -390,7 +390,7 @@ export function getAllPsetsTemplates(): PsetsTemplate[] {
 
   try {
     return db
-      .prepare('SELECT * FROM psets_template WHERE enabled = 1 ORDER BY sort_order ASC, id ASC')
+      .prepare('SELECT * FROM psets_template ORDER BY enabled DESC, sort_order ASC, id ASC')
       .all() as PsetsTemplate[];
   } finally {
     db.close();
@@ -720,7 +720,8 @@ export function getLatestPsetsCurrent(sessionId: number): PsetsCurrent | null {
 export function createSession(
   templateId: number,
   userId?: number,
-  projectPath?: string
+  projectPath?: string,
+  modelOverride?: string
 ): number {
   const db = initDatabase();
   const now = new Date().toISOString();
@@ -749,7 +750,7 @@ export function createSession(
       template.psets_name,
       template.icon,
       template.description,
-      template.model,
+      modelOverride || template.model,
       template.system_prompt,
       template.max_tokens,
       template.context_messages,

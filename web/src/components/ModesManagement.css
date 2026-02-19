@@ -209,3 +209,8 @@ button:disabled {
   margin-bottom: 1rem;
   border: 1px solid #f5c6cb;
 }
+
+/* 無効化されたテンプレート行 */
+.row-disabled {
+  opacity: 0.5;
+}

@@ -8,13 +8,41 @@ export type User = {
   role: 'admin' | 'user';
 };
 
-export type Mode = {
+export type PsetsTemplate = {
   id: number;
-  display_name: string;
-  description: string | null;
+  version: number;
+  visibility: 'public' | 'private';
+  sort_order: number;
+  psets_name: string;
   icon: string | null;
+  description: string | null;
+  model: string | null;
   system_prompt: string | null;
-  is_default: number;
+  max_tokens: number | null;
+  context_messages: number | null;
+  temperature: number | null;
+  top_p: number | null;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PsetsCurrent = {
+  id: number;
+  session_id: number;
+  template_id: number | null;
+  template_version: number | null;
+  seq: number;
+  psets_name: string;
+  icon: string | null;
+  description: string | null;
+  model: string | null;
+  system_prompt: string | null;
+  max_tokens: number | null;
+  context_messages: number | null;
+  temperature: number | null;
+  top_p: number | null;
+  created_at: string;
 };
 
 export type Model = {
@@ -26,14 +54,14 @@ export type Model = {
 
 export type Session = {
   id: number;
-  model: string;
   title: string | null;
   message_count: number;
   preview: string | null;
   created_at: string;
   updated_at: string;
-  mode_display_name?: string;
-  mode_icon?: string;
+  psets_name?: string;
+  psets_icon?: string;
+  model?: string;
   project_path?: string;
 };
 
@@ -57,6 +85,8 @@ export type ImportedSession = {
     updated_at?: string;
     project_path?: string | null;
     systemPrompt?: string | null;
+    psetsName?: string | null;
+    psetsIcon?: string | null;
   };
   messages: {
     role: 'user' | 'assistant';
