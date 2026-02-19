@@ -8,9 +8,12 @@ import {
   listSessions,
   getSession,
   updateSessionTitle,
+  updateSessionPsetsCurrent,
+  updatePsetsCurrent,
+  getLatestPsetsCurrent,
   deleteSession,
 } from '../../utils/database.js';
-import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -33,15 +36,14 @@ router.get('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
  */
 router.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { model, modeId, projectPath } = req.body;
+    const { templateId, projectPath } = req.body;
 
-    // バリデーション
-    if (!model) {
-      res.status(400).json({ error: 'Model is required', code: 'VALIDATION_ERROR' });
+    if (!templateId) {
+      res.status(400).json({ error: 'templateId is required', code: 'VALIDATION_ERROR' });
       return;
     }
 
-    const sessionId = createSession(model, req.user?.userId, modeId, projectPath);
+    const sessionId = createSession(templateId, req.user?.userId, projectPath);
 
     const sessionData = getSession(sessionId, req.user?.userId);
     if (!sessionData) {
@@ -52,9 +54,9 @@ router.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
     res.status(201).json({
       session: sessionData.session,
       systemPrompt: sessionData.systemPrompt,
-      modeName: sessionData.modeName,
-      modeDisplayName: sessionData.modeDisplayName,
-      modeIcon: sessionData.modeIcon,
+      psetsName: sessionData.psetsName,
+      psetsIcon: sessionData.psetsIcon,
+      model: sessionData.model,
     });
   } catch (error) {
     console.error('Create session error:', error);
@@ -83,9 +85,9 @@ router.get('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
       session: sessionData.session,
       messages: sessionData.messages,
       systemPrompt: sessionData.systemPrompt,
-      modeName: sessionData.modeName,
-      modeDisplayName: sessionData.modeDisplayName,
-      modeIcon: sessionData.modeIcon,
+      psetsName: sessionData.psetsName,
+      psetsIcon: sessionData.psetsIcon,
+      model: sessionData.model,
     });
   } catch (error) {
     console.error('Get session error:', error);
@@ -94,7 +96,7 @@ router.get('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
 });
 
 /**
- * PUT /api/sessions/:id - セッション更新
+ * PUT /api/sessions/:id - セッション更新（タイトル）
  */
 router.put('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -119,6 +121,55 @@ router.put('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
   } catch (error) {
     console.error('Update session error:', error);
     res.status(500).json({ error: 'Failed to update session', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * PUT /api/sessions/:id/psets - psets_currentを更新
+ */
+router.put('/:id/psets', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid session ID', code: 'INVALID_ID' });
+      return;
+    }
+
+    // psets_currentに新しいレコードをinsert（seq++）
+    const newPsetsCurrentId = updatePsetsCurrent(id, req.body);
+
+    // sessionsのpsets_current_idを更新
+    updateSessionPsetsCurrent(id, newPsetsCurrentId);
+
+    const psetsCurrent = getLatestPsetsCurrent(id);
+    res.json({ psets_current: psetsCurrent });
+  } catch (error) {
+    console.error('Update session psets error:', error);
+    res.status(500).json({ error: 'Failed to update psets', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * GET /api/sessions/:id/psets - psets_currentを取得
+ */
+router.get('/:id/psets', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid session ID', code: 'INVALID_ID' });
+      return;
+    }
+
+    const psetsCurrent = getLatestPsetsCurrent(id);
+    if (!psetsCurrent) {
+      res.status(404).json({ error: 'Psets not found', code: 'NOT_FOUND' });
+      return;
+    }
+
+    res.json({ psets_current: psetsCurrent });
+  } catch (error) {
+    console.error('Get session psets error:', error);
+    res.status(500).json({ error: 'Failed to get psets', code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -163,18 +214,19 @@ router.get('/:id/export', authMiddleware, (req: AuthenticatedRequest, res: Respo
       return;
     }
 
-    // エクスポート用のJSON構造を作成
     const exportData = {
-      version: '1.0',
+      version: '2.0',
       exportedAt: new Date().toISOString(),
       session: {
         id: sessionData.session.id,
         title: sessionData.session.title,
-        model: sessionData.session.model,
+        model: sessionData.model,
         created_at: sessionData.session.created_at,
         updated_at: sessionData.session.updated_at,
         project_path: sessionData.session.project_path,
         systemPrompt: sessionData.systemPrompt,
+        psetsName: sessionData.psetsName,
+        psetsIcon: sessionData.psetsIcon,
       },
       messages: sessionData.messages.map(msg => ({
         role: msg.role,
@@ -185,20 +237,14 @@ router.get('/:id/export', authMiddleware, (req: AuthenticatedRequest, res: Respo
       })),
     };
 
-    // ファイル名に使用するためのタイトル（特殊文字を除去）
     const title = sessionData.session.title || 'chat';
-    console.log('Export - original title:', title);
     const safeTitle = title
       .replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\s-]/g, '')
       .substring(0, 50)
       .trim() || 'chat';
-    console.log('Export - safeTitle:', safeTitle);
-    
-    // Content-Dispositionヘッダーでファイル名を指定（RFC 5987形式で日本語対応）
+
     const filename = `llamune_chat_${safeTitle}_${id}.json`;
-    console.log('Export - filename:', filename);
     const encodedFilename = encodeURIComponent(filename);
-    console.log('Export - encodedFilename:', encodedFilename);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');

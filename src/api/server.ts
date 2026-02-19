@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 
 import authRouter from './routes/auth.js';
-import modesRouter from './routes/modes.js';
+import psetsTemplateRouter from './routes/psets_template.js';
 import sessionsRouter from './routes/sessions.js';
 import chatRouter from './routes/chat.js';
 import modelsRouter from './routes/models.js';
@@ -30,7 +30,7 @@ app.use((req, res, next) => {
 
 // ルート
 app.use('/api/auth', authRouter);
-app.use('/api/modes', modesRouter);
+app.use('/api/psets_template', psetsTemplateRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/models', modelsRouter);

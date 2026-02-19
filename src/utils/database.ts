@@ -44,18 +44,67 @@ export interface RefreshToken {
 }
 
 /**
- * モードの型定義
+ * パラメータセットテンプレートの型定義
  */
-export interface Mode {
+export interface PsetsTemplate {
   id: number;
-  display_name: string;
-  description: string | null;
+  version: number;
+  visibility: 'public' | 'private';
+  sort_order: number;
+  psets_name: string;
   icon: string | null;
+  description: string | null;
+  model: string | null;
   system_prompt: string | null;
-  is_default: number;
+  max_tokens: number | null;
+  context_messages: number | null;
+  temperature: number | null;
+  top_p: number | null;
   enabled: number;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * パラメータセットテンプレート履歴の型定義
+ */
+export interface PsetsTemplateHistory {
+  id: number;
+  template_id: number;
+  version: number;
+  visibility: 'public' | 'private';
+  sort_order: number;
+  psets_name: string;
+  icon: string | null;
+  description: string | null;
+  model: string | null;
+  system_prompt: string | null;
+  max_tokens: number | null;
+  context_messages: number | null;
+  temperature: number | null;
+  top_p: number | null;
+  created_at: string;
+}
+
+/**
+ * セッション別パラメータセットの型定義
+ */
+export interface PsetsCurrent {
+  id: number;
+  session_id: number;
+  template_id: number | null;
+  template_version: number | null;
+  seq: number;
+  psets_name: string;
+  icon: string | null;
+  description: string | null;
+  model: string | null;
+  system_prompt: string | null;
+  max_tokens: number | null;
+  context_messages: number | null;
+  temperature: number | null;
+  top_p: number | null;
+  created_at: string;
 }
 
 /**
@@ -64,11 +113,9 @@ export interface Mode {
 export interface Session {
   id: number;
   user_id: number | null;
-  model: string;
-  mode_id: number | null;
-  system_prompt_snapshot: string | null;
   title: string | null;
   project_path: string | null;
+  psets_current_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,14 +125,14 @@ export interface Session {
  */
 export interface SessionListItem {
   id: number;
-  model: string;
   title: string | null;
   message_count: number;
   preview: string | null;
   created_at: string;
   updated_at: string;
-  mode_display_name?: string;
-  mode_icon?: string;
+  psets_name?: string;
+  psets_icon?: string;
+  model?: string;
   project_path?: string;
 }
 
@@ -97,7 +144,7 @@ export interface Message {
   content: string;
   model?: string;
   thinking?: string;
-  is_adopted?: boolean;  // true=採用(LLMコンテキストに含む), false=履歴のみ
+  is_adopted?: boolean;
 }
 
 /**
@@ -118,7 +165,7 @@ export interface MessageTurn {
 }
 
 // ========================================
-// デフォルトモードのシステムプロンプト
+// デフォルトテンプレートのシステムプロンプト
 // ========================================
 
 const DEFAULT_PROFESSIONAL_PROMPT = `**必ず日本語で応答してください。**
@@ -197,19 +244,69 @@ export function initDatabase(): Database.Database {
     )
   `);
 
-  // モードテーブル
+  // パラメータセットテンプレートテーブル
   db.exec(`
-    CREATE TABLE IF NOT EXISTS modes (
+    CREATE TABLE IF NOT EXISTS psets_template (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      display_name TEXT NOT NULL,
-      description TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      visibility TEXT NOT NULL DEFAULT 'private',
+      sort_order INTEGER NOT NULL DEFAULT 100,
+      psets_name TEXT NOT NULL,
       icon TEXT,
+      description TEXT,
+      model TEXT,
       system_prompt TEXT,
-      is_default INTEGER NOT NULL DEFAULT 0,
+      max_tokens INTEGER,
+      context_messages INTEGER,
+      temperature REAL,
+      top_p REAL,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    )
+  `);
+
+  // パラメータセットテンプレート履歴テーブル
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS psets_template_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,
+      version INTEGER NOT NULL,
+      visibility TEXT NOT NULL,
+      sort_order INTEGER NOT NULL,
+      psets_name TEXT NOT NULL,
+      icon TEXT,
+      description TEXT,
+      model TEXT,
+      system_prompt TEXT,
+      max_tokens INTEGER,
+      context_messages INTEGER,
+      temperature REAL,
+      top_p REAL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (template_id) REFERENCES psets_template(id)
+    )
+  `);
+
+  // セッション別パラメータセットテーブル
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS psets_current (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL,
+      template_id INTEGER,
+      template_version INTEGER,
+      seq INTEGER NOT NULL DEFAULT 0,
+      psets_name TEXT NOT NULL,
+      icon TEXT,
+      description TEXT,
+      model TEXT,
+      system_prompt TEXT,
+      max_tokens INTEGER,
+      context_messages INTEGER,
+      temperature REAL,
+      top_p REAL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id)
     )
   `);
 
@@ -218,15 +315,13 @@ export function initDatabase(): Database.Database {
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
-      model TEXT NOT NULL,
-      mode_id INTEGER,
-      system_prompt_snapshot TEXT,
       title TEXT,
       project_path TEXT,
+      psets_current_id INTEGER,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-      FOREIGN KEY (mode_id) REFERENCES modes(id) ON DELETE SET NULL
+      FOREIGN KEY (psets_current_id) REFERENCES psets_current(id)
     )
   `);
 
@@ -246,149 +341,117 @@ export function initDatabase(): Database.Database {
     )
   `);
 
-  // マイグレーション: is_adopted カラムが存在しない場合は追加
-  const columns = db.prepare("PRAGMA table_info(messages)").all() as Array<{ name: string }>;
-  const hasIsAdopted = columns.some(col => col.name === 'is_adopted');
-  if (!hasIsAdopted) {
-    db.exec('ALTER TABLE messages ADD COLUMN is_adopted INTEGER DEFAULT 1');
-  }
-
-  // デフォルトモードの初期化
-  initializeDefaultModes(db);
+  // デフォルトテンプレートの初期化
+  initializeDefaultTemplates(db);
 
   return db;
 }
 
 /**
- * デフォルトモードを初期化
+ * デフォルトテンプレートを初期化
  */
-function initializeDefaultModes(db: Database.Database): void {
+function initializeDefaultTemplates(db: Database.Database): void {
   const now = new Date().toISOString();
 
   // あなたの本職を支援
   const professionalExists = db
-    .prepare("SELECT id FROM modes WHERE name = 'professional'")
+    .prepare("SELECT id FROM psets_template WHERE psets_name = 'あなたの本職を支援'")
     .get();
 
   if (!professionalExists) {
     db.prepare(`
-      INSERT INTO modes (name, display_name, description, icon, system_prompt, is_default, enabled, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      'professional',
-      'あなたの本職を支援',
-      'コード生成の支援',
-      '💻',
-      DEFAULT_PROFESSIONAL_PROMPT,
-      1,
-      1,
-      now,
-      now
-    );
+      INSERT INTO psets_template (version, visibility, sort_order, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(1, 'public', 10, 'あなたの本職を支援', '💻', 'コード生成の支援', null, DEFAULT_PROFESSIONAL_PROMPT, null, null, null, null, 1, now, now);
   }
 
   // 一般的な対話
   const generalExists = db
-    .prepare("SELECT id FROM modes WHERE name = 'general'")
+    .prepare("SELECT id FROM psets_template WHERE psets_name = '一般的な対話'")
     .get();
 
   if (!generalExists) {
     db.prepare(`
-      INSERT INTO modes (name, display_name, description, icon, system_prompt, is_default, enabled, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      'general',
-      '一般的な対話',
-      '一般的な対話と推論',
-      '🤖',
-      null,
-      1,
-      1,
-      now,
-      now
-    );
+      INSERT INTO psets_template (version, visibility, sort_order, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(1, 'public', 20, '一般的な対話', '🤖', '一般的な対話と推論', null, null, null, null, null, null, 1, now, now);
   }
 }
 
 // ========================================
-// モード管理
+// パラメータセットテンプレート管理
 // ========================================
 
 /**
- * すべてのモードを取得
+ * すべてのテンプレートを取得（enabled=1のみ）
  */
-export function getAllModes(): Mode[] {
+export function getAllPsetsTemplates(): PsetsTemplate[] {
   const db = initDatabase();
 
   try {
-    const modes = db
-      .prepare('SELECT * FROM modes WHERE enabled = 1 ORDER BY is_default DESC, id ASC')
-      .all() as Mode[];
-
-    return modes;
+    return db
+      .prepare('SELECT * FROM psets_template WHERE enabled = 1 ORDER BY sort_order ASC, id ASC')
+      .all() as PsetsTemplate[];
   } finally {
     db.close();
   }
 }
 
 /**
- * IDでモードを取得
+ * IDでテンプレートを取得
  */
-export function getModeById(id: number): Mode | null {
+export function getPsetsTemplateById(id: number): PsetsTemplate | null {
   const db = initDatabase();
 
   try {
-    const mode = db
-      .prepare('SELECT * FROM modes WHERE id = ? AND enabled = 1')
-      .get(id) as Mode | undefined;
+    const template = db
+      .prepare('SELECT * FROM psets_template WHERE id = ?')
+      .get(id) as PsetsTemplate | undefined;
 
-    return mode || null;
+    return template || null;
   } finally {
     db.close();
   }
 }
 
 /**
- * 名前でモードを取得
+ * テンプレートを作成
  */
-/**
- * モードを作成
- */
-export function createMode(
-  displayName: string,
-  description: string | null,
-  icon: string | null,
-  systemPrompt: string | null
-): number {
+export function createPsetsTemplate(params: {
+  visibility: 'public' | 'private';
+  sort_order?: number;
+  psets_name: string;
+  icon?: string | null;
+  description?: string | null;
+  model?: string | null;
+  system_prompt?: string | null;
+  max_tokens?: number | null;
+  context_messages?: number | null;
+  temperature?: number | null;
+  top_p?: number | null;
+}): number {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   try {
-    // 一意のname生成（内部的にのみ使用、display_nameをベースに作成）
-    const baseName = displayName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-    
-    let name = baseName;
-    let counter = 1;
-    
-    // 重複チェック
-    while (true) {
-      const existing = db
-        .prepare('SELECT id FROM modes WHERE name = ?')
-        .get(name);
-      if (!existing) break;
-      name = `${baseName}_${counter}`;
-      counter++;
-    }
-    
-    const result = db
-      .prepare(`
-        INSERT INTO modes (name, display_name, description, icon, system_prompt, is_default, enabled, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?)
-      `)
-      .run(name, displayName, description, icon, systemPrompt, now, now);
+    const result = db.prepare(`
+      INSERT INTO psets_template (version, visibility, sort_order, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, enabled, created_at, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `).run(
+      params.visibility,
+      params.sort_order ?? 100,
+      params.psets_name,
+      params.icon ?? null,
+      params.description ?? null,
+      params.model ?? null,
+      params.system_prompt ?? null,
+      params.max_tokens ?? null,
+      params.context_messages ?? null,
+      params.temperature ?? null,
+      params.top_p ?? null,
+      now,
+      now
+    );
 
     return result.lastInsertRowid as number;
   } finally {
@@ -397,38 +460,74 @@ export function createMode(
 }
 
 /**
- * モードを更新
+ * テンプレートを更新（履歴保存 + version++）
  */
-export function updateMode(
+export function updatePsetsTemplate(
   id: number,
-  updates: {
-    displayName?: string;
-    description?: string | null;
-    icon?: string | null;
-    systemPrompt?: string | null;
-  }
+  updates: Partial<Omit<PsetsTemplate, 'id' | 'version' | 'created_at' | 'updated_at'>>
 ): boolean {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   try {
-    const mode = db.prepare('SELECT * FROM modes WHERE id = ?').get(id) as Mode | undefined;
-    if (!mode) {
-      return false;
-    }
+    const template = db.prepare('SELECT * FROM psets_template WHERE id = ?').get(id) as PsetsTemplate | undefined;
+    if (!template) return false;
 
-    const newDisplayName = updates.displayName ?? mode.display_name;
-    const newDescription = updates.description !== undefined ? updates.description : mode.description;
-    const newIcon = updates.icon !== undefined ? updates.icon : mode.icon;
-    const newSystemPrompt = updates.systemPrompt !== undefined ? updates.systemPrompt : mode.system_prompt;
+    // 更新前の内容を履歴に保存
+    db.prepare(`
+      INSERT INTO psets_template_history (template_id, version, visibility, sort_order, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      template.id,
+      template.version,
+      template.visibility,
+      template.sort_order,
+      template.psets_name,
+      template.icon,
+      template.description,
+      template.model,
+      template.system_prompt,
+      template.max_tokens,
+      template.context_messages,
+      template.temperature,
+      template.top_p,
+      now
+    );
 
-    const result = db
-      .prepare(`
-        UPDATE modes 
-        SET display_name = ?, description = ?, icon = ?, system_prompt = ?, updated_at = ?
-        WHERE id = ?
-      `)
-      .run(newDisplayName, newDescription, newIcon, newSystemPrompt, now, id);
+    // テンプレートを更新（version++）
+    const result = db.prepare(`
+      UPDATE psets_template SET
+        version = version + 1,
+        visibility = ?,
+        sort_order = ?,
+        psets_name = ?,
+        icon = ?,
+        description = ?,
+        model = ?,
+        system_prompt = ?,
+        max_tokens = ?,
+        context_messages = ?,
+        temperature = ?,
+        top_p = ?,
+        enabled = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(
+      updates.visibility ?? template.visibility,
+      updates.sort_order ?? template.sort_order,
+      updates.psets_name ?? template.psets_name,
+      updates.icon !== undefined ? updates.icon : template.icon,
+      updates.description !== undefined ? updates.description : template.description,
+      updates.model !== undefined ? updates.model : template.model,
+      updates.system_prompt !== undefined ? updates.system_prompt : template.system_prompt,
+      updates.max_tokens !== undefined ? updates.max_tokens : template.max_tokens,
+      updates.context_messages !== undefined ? updates.context_messages : template.context_messages,
+      updates.temperature !== undefined ? updates.temperature : template.temperature,
+      updates.top_p !== undefined ? updates.top_p : template.top_p,
+      updates.enabled !== undefined ? updates.enabled : template.enabled,
+      now,
+      id
+    );
 
     return result.changes > 0;
   } finally {
@@ -437,20 +536,175 @@ export function updateMode(
 }
 
 /**
- * モードを削除（is_default=0のみ）
+ * テンプレートを論理削除（enabled=0）
  */
-export function deleteMode(id: number): boolean {
+export function disablePsetsTemplate(id: number): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare('UPDATE psets_template SET enabled = 0, updated_at = ? WHERE id = ?')
+      .run(now, id);
+
+    return result.changes > 0;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * テンプレートをコピー（version=1、名前に「のコピー」を追加）
+ */
+export function copyPsetsTemplate(id: number): number | null {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const template = db.prepare('SELECT * FROM psets_template WHERE id = ?').get(id) as PsetsTemplate | undefined;
+    if (!template) return null;
+
+    const result = db.prepare(`
+      INSERT INTO psets_template (version, visibility, sort_order, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, enabled, created_at, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `).run(
+      template.visibility,
+      template.sort_order + 1,
+      `${template.psets_name} のコピー`,
+      template.icon,
+      template.description,
+      template.model,
+      template.system_prompt,
+      template.max_tokens,
+      template.context_messages,
+      template.temperature,
+      template.top_p,
+      now,
+      now
+    );
+
+    return result.lastInsertRowid as number;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * テンプレートの表示順を更新（ドラッグ＆ドロップ用）
+ */
+export function updatePsetsTemplateSortOrder(orders: { id: number; sort_order: number }[]): void {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const update = db.prepare('UPDATE psets_template SET sort_order = ?, updated_at = ? WHERE id = ?');
+    const updateMany = db.transaction((items: { id: number; sort_order: number }[]) => {
+      for (const item of items) {
+        update.run(item.sort_order, now, item.id);
+      }
+    });
+    updateMany(orders);
+  } finally {
+    db.close();
+  }
+}
+
+// ========================================
+// psets_current 管理
+// ========================================
+
+/**
+ * セッション作成時にテンプレートからpsets_currentを作成
+ */
+export function createPsetsCurrent(
+  sessionId: number,
+  template: PsetsTemplate
+): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db.prepare(`
+      INSERT INTO psets_current (session_id, template_id, template_version, seq, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, created_at)
+      VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      sessionId,
+      template.id,
+      template.version,
+      template.psets_name,
+      template.icon,
+      template.description,
+      template.model,
+      template.system_prompt,
+      template.max_tokens,
+      template.context_messages,
+      template.temperature,
+      template.top_p,
+      now
+    );
+
+    return result.lastInsertRowid as number;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * psets_currentを更新（seq++して新しいレコードをinsert）
+ */
+export function updatePsetsCurrent(
+  sessionId: number,
+  updates: Partial<Omit<PsetsCurrent, 'id' | 'session_id' | 'seq' | 'created_at'>>
+): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    // 現在の最新レコードを取得
+    const current = db
+      .prepare('SELECT * FROM psets_current WHERE session_id = ? ORDER BY seq DESC LIMIT 1')
+      .get(sessionId) as PsetsCurrent | undefined;
+
+    const nextSeq = current ? current.seq + 1 : 0;
+
+    const result = db.prepare(`
+      INSERT INTO psets_current (session_id, template_id, template_version, seq, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      sessionId,
+      updates.template_id !== undefined ? updates.template_id : (current?.template_id ?? null),
+      updates.template_version !== undefined ? updates.template_version : (current?.template_version ?? null),
+      nextSeq,
+      updates.psets_name ?? current?.psets_name ?? '',
+      updates.icon !== undefined ? updates.icon : (current?.icon ?? null),
+      updates.description !== undefined ? updates.description : (current?.description ?? null),
+      updates.model !== undefined ? updates.model : (current?.model ?? null),
+      updates.system_prompt !== undefined ? updates.system_prompt : (current?.system_prompt ?? null),
+      updates.max_tokens !== undefined ? updates.max_tokens : (current?.max_tokens ?? null),
+      updates.context_messages !== undefined ? updates.context_messages : (current?.context_messages ?? null),
+      updates.temperature !== undefined ? updates.temperature : (current?.temperature ?? null),
+      updates.top_p !== undefined ? updates.top_p : (current?.top_p ?? null),
+      now
+    );
+
+    return result.lastInsertRowid as number;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * セッションの最新psets_currentを取得
+ */
+export function getLatestPsetsCurrent(sessionId: number): PsetsCurrent | null {
   const db = initDatabase();
 
   try {
-    // デフォルトモードは削除不可
-    const mode = db.prepare('SELECT is_default FROM modes WHERE id = ?').get(id) as { is_default: number } | undefined;
-    if (!mode || mode.is_default === 1) {
-      return false;
-    }
+    const current = db
+      .prepare('SELECT * FROM psets_current WHERE session_id = ? ORDER BY seq DESC LIMIT 1')
+      .get(sessionId) as PsetsCurrent | undefined;
 
-    const result = db.prepare('DELETE FROM modes WHERE id = ? AND is_default = 0').run(id);
-    return result.changes > 0;
+    return current || null;
   } finally {
     db.close();
   }
@@ -464,30 +718,52 @@ export function deleteMode(id: number): boolean {
  * 新しいセッションを作成
  */
 export function createSession(
-  model: string,
+  templateId: number,
   userId?: number,
-  modeId?: number,
   projectPath?: string
 ): number {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   try {
-    // モードからシステムプロンプトを取得してスナップショットを保存
-    let systemPromptSnapshot: string | null = null;
-    if (modeId) {
-      const mode = db.prepare('SELECT system_prompt FROM modes WHERE id = ?').get(modeId) as { system_prompt: string | null } | undefined;
-      systemPromptSnapshot = mode?.system_prompt || null;
-    }
+    // テンプレートを取得
+    const template = db.prepare('SELECT * FROM psets_template WHERE id = ?').get(templateId) as PsetsTemplate | undefined;
+    if (!template) throw new Error(`PsetsTemplate not found: ${templateId}`);
 
-    const result = db
-      .prepare(`
-        INSERT INTO sessions (model, user_id, mode_id, system_prompt_snapshot, project_path, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(model, userId || null, modeId || null, systemPromptSnapshot, projectPath || null, now, now);
+    // セッションを作成（psets_current_idは後で更新）
+    const sessionResult = db.prepare(`
+      INSERT INTO sessions (user_id, title, project_path, psets_current_id, created_at, updated_at)
+      VALUES (?, NULL, ?, NULL, ?, ?)
+    `).run(userId || null, projectPath || null, now, now);
 
-    return result.lastInsertRowid as number;
+    const sessionId = sessionResult.lastInsertRowid as number;
+
+    // psets_currentを作成
+    const psetsCurrentResult = db.prepare(`
+      INSERT INTO psets_current (session_id, template_id, template_version, seq, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, created_at)
+      VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      sessionId,
+      template.id,
+      template.version,
+      template.psets_name,
+      template.icon,
+      template.description,
+      template.model,
+      template.system_prompt,
+      template.max_tokens,
+      template.context_messages,
+      template.temperature,
+      template.top_p,
+      now
+    );
+
+    const psetsCurrentId = psetsCurrentResult.lastInsertRowid as number;
+
+    // sessionsのpsets_current_idを更新
+    db.prepare('UPDATE sessions SET psets_current_id = ? WHERE id = ?').run(psetsCurrentId, sessionId);
+
+    return sessionId;
   } finally {
     db.close();
   }
@@ -503,13 +779,13 @@ export function listSessions(limit = 200, userId?: number): SessionListItem[] {
     let query = `
       SELECT
         s.id,
-        s.model,
-        s.created_at,
-        s.updated_at,
         s.title,
         s.project_path,
-        md.display_name as mode_display_name,
-        md.icon as mode_icon,
+        s.created_at,
+        s.updated_at,
+        pc.psets_name,
+        pc.icon as psets_icon,
+        pc.model,
         COUNT(m.id) as message_count,
         (
           SELECT content
@@ -520,7 +796,7 @@ export function listSessions(limit = 200, userId?: number): SessionListItem[] {
         ) as preview
       FROM sessions s
       LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
-      LEFT JOIN modes md ON s.mode_id = md.id
+      LEFT JOIN psets_current pc ON s.psets_current_id = pc.id
     `;
 
     if (userId !== undefined) {
@@ -560,50 +836,38 @@ export function getSession(sessionId: number, userId?: number): {
   session: Session;
   messages: Message[];
   systemPrompt?: string;
-  modeName?: string;
-  modeDisplayName?: string;
-  modeIcon?: string;
+  psetsName?: string;
+  psetsIcon?: string;
+  model?: string;
 } | null {
   const db = initDatabase();
 
   try {
     const session = db
-      .prepare(`SELECT * FROM sessions WHERE id = ?`)
+      .prepare('SELECT * FROM sessions WHERE id = ?')
       .get(sessionId) as Session | undefined;
 
-    if (!session) {
-      return null;
-    }
+    if (!session) return null;
 
     // 所有者チェック
-    if (userId !== undefined && session.user_id !== userId) {
-      return null;
-    }
+    if (userId !== undefined && session.user_id !== userId) return null;
 
-    // モード情報とシステムプロンプトを取得
+    // psets_currentから情報を取得
     let systemPrompt: string | undefined;
-    let modeDisplayName: string | undefined;
-    let modeIcon: string | undefined;
+    let psetsName: string | undefined;
+    let psetsIcon: string | undefined;
+    let model: string | undefined;
 
-    if (session.system_prompt_snapshot) {
-      systemPrompt = session.system_prompt_snapshot;
-    }
-    
-    if (session.mode_id) {
-      const mode = db
-        .prepare('SELECT display_name, icon, system_prompt FROM modes WHERE id = ?')
-        .get(session.mode_id) as { 
-          display_name?: string;
-          icon?: string;
-          system_prompt?: string;
-        } | undefined;
-      
-      if (mode) {
-        modeDisplayName = mode.display_name;
-        modeIcon = mode.icon || undefined;
-        if (!systemPrompt) {
-          systemPrompt = mode.system_prompt || undefined;
-        }
+    if (session.psets_current_id) {
+      const pc = db
+        .prepare('SELECT * FROM psets_current WHERE id = ?')
+        .get(session.psets_current_id) as PsetsCurrent | undefined;
+
+      if (pc) {
+        systemPrompt = pc.system_prompt || undefined;
+        psetsName = pc.psets_name;
+        psetsIcon = pc.icon || undefined;
+        model = pc.model || undefined;
       }
     }
 
@@ -629,16 +893,10 @@ export function getSession(sessionId: number, userId?: number): {
       content: decrypt(msg.content),
       model: msg.model,
       thinking: msg.thinking ? decrypt(msg.thinking) : undefined,
-      is_adopted: msg.is_adopted !== 0,  // 0以外はtrue（デフォルトも含む）
+      is_adopted: msg.is_adopted !== 0,
     }));
 
-    return {
-      session,
-      messages,
-      systemPrompt,
-      modeDisplayName,
-      modeIcon,
-    };
+    return { session, messages, systemPrompt, psetsName, psetsIcon, model };
   } finally {
     db.close();
   }
@@ -668,16 +926,16 @@ export function updateSessionTitle(sessionId: number, title: string, userId?: nu
 }
 
 /**
- * セッションのモデルを更新
+ * セッションのpsets_current_idを更新
  */
-export function updateSessionModel(sessionId: number, modelName: string): boolean {
+export function updateSessionPsetsCurrent(sessionId: number, psetsCurrentId: number): boolean {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   try {
     const result = db
-      .prepare('UPDATE sessions SET model = ?, updated_at = ? WHERE id = ?')
-      .run(modelName, now, sessionId);
+      .prepare('UPDATE sessions SET psets_current_id = ?, updated_at = ? WHERE id = ?')
+      .run(psetsCurrentId, now, sessionId);
 
     return result.changes > 0;
   } finally {
@@ -725,7 +983,6 @@ export function saveMessage(
   const now = new Date().toISOString();
 
   try {
-    // contentとthinkingを暗号化
     const encryptedContent = encrypt(content);
     const encryptedThinking = thinking ? encrypt(thinking) : null;
 
@@ -733,7 +990,6 @@ export function saveMessage(
       'INSERT INTO messages (session_id, role, content, created_at, model, thinking) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(sessionId, role, encryptedContent, now, model || null, encryptedThinking);
 
-    // セッションの更新日時を更新
     db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
 
     // 最初のユーザーメッセージの場合、タイトルを自動設定
@@ -768,7 +1024,6 @@ export function getSessionMessagesWithTurns(sessionId: number): MessageTurn[] {
       `)
       .all(sessionId) as MessageWithId[];
 
-    // user-assistant のペアに変換
     const turns: MessageTurn[] = [];
     for (let i = 0; i < messages.length; i += 2) {
       if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
@@ -806,9 +1061,7 @@ export function logicalDeleteMessagesAfterTurn(sessionId: number, turnNumber: nu
     const deleteFromIndex = turnNumber * 2;
     const messageIdsToDelete = messages.slice(deleteFromIndex).map((m) => m.id);
 
-    if (messageIdsToDelete.length === 0) {
-      return 0;
-    }
+    if (messageIdsToDelete.length === 0) return 0;
 
     const placeholders = messageIdsToDelete.map(() => '?').join(',');
     const result = db
@@ -834,13 +1087,9 @@ export function deleteSecondLastAssistantMessage(sessionId: number): boolean {
       .prepare('SELECT id FROM messages WHERE session_id = ? AND role = ? ORDER BY id DESC LIMIT 2')
       .all(sessionId, 'assistant') as { id: number }[];
 
-    if (assistantMessages.length < 2) {
-      return false;
-    }
+    if (assistantMessages.length < 2) return false;
 
-    const secondLastMessageId = assistantMessages[1].id;
-    db.prepare('DELETE FROM messages WHERE id = ?').run(secondLastMessageId);
-
+    db.prepare('DELETE FROM messages WHERE id = ?').run(assistantMessages[1].id);
     return true;
   } finally {
     db.close();
@@ -858,12 +1107,9 @@ export function deleteLastAssistantMessage(sessionId: number): boolean {
       .prepare('SELECT id FROM messages WHERE session_id = ? AND role = ? ORDER BY id DESC LIMIT 1')
       .get(sessionId, 'assistant') as { id: number } | undefined;
 
-    if (!lastMessage) {
-      return false;
-    }
+    if (!lastMessage) return false;
 
     db.prepare('DELETE FROM messages WHERE id = ?').run(lastMessage.id);
-
     return true;
   } finally {
     db.close();
@@ -872,32 +1118,25 @@ export function deleteLastAssistantMessage(sessionId: number): boolean {
 
 /**
  * セッションの最新のアシスタントメッセージ群を取得（リトライ候補用）
- * 最後のユーザーメッセージ以降のアシスタントメッセージをすべて取得
  */
 export function getRetryAssistantMessages(sessionId: number): Array<{ id: number; model?: string }> {
   const db = initDatabase();
 
   try {
-    // 最後のユーザーメッセージのIDを取得
     const lastUserMessage = db
       .prepare('SELECT id FROM messages WHERE session_id = ? AND role = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1')
       .get(sessionId, 'user') as { id: number } | undefined;
 
-    if (!lastUserMessage) {
-      return [];
-    }
+    if (!lastUserMessage) return [];
 
-    // そのユーザーメッセージ以降のアシスタントメッセージを取得
-    const messages = db
+    return db
       .prepare(`
-        SELECT id, model 
-        FROM messages 
+        SELECT id, model
+        FROM messages
         WHERE session_id = ? AND role = ? AND id > ? AND deleted_at IS NULL
         ORDER BY id ASC
       `)
       .all(sessionId, 'assistant', lastUserMessage.id) as Array<{ id: number; model?: string }>;
-
-    return messages;
   } finally {
     db.close();
   }
@@ -905,10 +1144,6 @@ export function getRetryAssistantMessages(sessionId: number): Array<{ id: number
 
 /**
  * リトライ回答を選択処理
- * @param sessionId セッションID
- * @param adoptedMessageId 採用するメッセージID（is_adopted=1）
- * @param keepMessageIds 履歴に残すメッセージID群（is_adopted=0）
- * @param discardMessageIds 破棄するメッセージID群（削除）
  */
 export function selectRetryAnswer(
   sessionId: number,
@@ -920,28 +1155,22 @@ export function selectRetryAnswer(
   const now = new Date().toISOString();
 
   try {
-    // トランザクション開始
     db.exec('BEGIN TRANSACTION');
 
-    // 1. 採用するメッセージを is_adopted=1 に設定
     db.prepare('UPDATE messages SET is_adopted = 1 WHERE id = ? AND session_id = ?')
       .run(adoptedMessageId, sessionId);
 
-    // 2. 履歴に残すメッセージを is_adopted=0 に設定
     for (const messageId of keepMessageIds) {
       db.prepare('UPDATE messages SET is_adopted = 0 WHERE id = ? AND session_id = ?')
         .run(messageId, sessionId);
     }
 
-    // 3. 破棄するメッセージを削除
     for (const messageId of discardMessageIds) {
       db.prepare('DELETE FROM messages WHERE id = ? AND session_id = ?')
         .run(messageId, sessionId);
     }
 
-    // セッションの更新日時を更新
     db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
-
     db.exec('COMMIT');
     return true;
   } catch (error) {
@@ -956,22 +1185,13 @@ export function selectRetryAnswer(
 // ユーザー管理
 // ========================================
 
-/**
- * ユーザーを作成
- */
-export function createUser(
-  username: string,
-  passwordHash: string,
-  role: 'admin' | 'user' = 'user'
-): number {
+export function createUser(username: string, passwordHash: string, role: 'admin' | 'user' = 'user'): number {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   try {
     const result = db
-      .prepare(
-        'INSERT INTO users (username, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-      )
+      .prepare('INSERT INTO users (username, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
       .run(username, passwordHash, role, now, now);
 
     return result.lastInsertRowid as number;
@@ -980,60 +1200,40 @@ export function createUser(
   }
 }
 
-/**
- * ユーザー名でユーザーを取得
- */
 export function getUserByUsername(username: string): User | null {
   const db = initDatabase();
 
   try {
-    const user = db
-      .prepare('SELECT * FROM users WHERE username = ?')
-      .get(username) as User | undefined;
-
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as User | undefined;
     return user || null;
   } finally {
     db.close();
   }
 }
 
-/**
- * IDでユーザーを取得
- */
 export function getUserById(userId: number): User | null {
   const db = initDatabase();
 
   try {
-    const user = db
-      .prepare('SELECT * FROM users WHERE id = ?')
-      .get(userId) as User | undefined;
-
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as User | undefined;
     return user || null;
   } finally {
     db.close();
   }
 }
 
-/**
- * すべてのユーザーを取得
- */
 export function getAllUsers(): User[] {
   const db = initDatabase();
 
   try {
-    const users = db
+    return db
       .prepare('SELECT id, username, role, created_at, updated_at FROM users ORDER BY created_at DESC')
       .all() as User[];
-
-    return users;
   } finally {
     db.close();
   }
 }
 
-/**
- * ユーザーのパスワードを更新
- */
 export function updateUserPassword(userId: number, newPasswordHash: string): boolean {
   const db = initDatabase();
   const now = new Date().toISOString();
@@ -1049,9 +1249,6 @@ export function updateUserPassword(userId: number, newPasswordHash: string): boo
   }
 }
 
-/**
- * ユーザーを削除
- */
 export function deleteUser(userId: number): boolean {
   const db = initDatabase();
 
@@ -1067,9 +1264,6 @@ export function deleteUser(userId: number): boolean {
 // リフレッシュトークン管理
 // ========================================
 
-/**
- * リフレッシュトークンを保存
- */
 export function saveRefreshToken(
   userId: number,
   token: string,
@@ -1084,8 +1278,8 @@ export function saveRefreshToken(
   try {
     const result = db
       .prepare(`
-        INSERT INTO refresh_tokens 
-        (user_id, token, expires_at, created_at, device_fingerprint, device_type, last_used_at, created_via) 
+        INSERT INTO refresh_tokens
+        (user_id, token, expires_at, created_at, device_fingerprint, device_type, last_used_at, created_via)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(userId, token, expiresAt, now, deviceFingerprint, deviceType, now, createdVia);
@@ -1096,9 +1290,6 @@ export function saveRefreshToken(
   }
 }
 
-/**
- * リフレッシュトークンを取得
- */
 export function getRefreshToken(token: string): RefreshToken | null {
   const db = initDatabase();
 
@@ -1113,9 +1304,6 @@ export function getRefreshToken(token: string): RefreshToken | null {
   }
 }
 
-/**
- * リフレッシュトークンを削除
- */
 export function deleteRefreshToken(token: string): boolean {
   const db = initDatabase();
 
@@ -1127,35 +1315,23 @@ export function deleteRefreshToken(token: string): boolean {
   }
 }
 
-/**
- * ユーザーのすべてのリフレッシュトークンを削除
- */
 export function deleteAllRefreshTokensForUser(userId: number): number {
   const db = initDatabase();
 
   try {
-    const result = db
-      .prepare('DELETE FROM refresh_tokens WHERE user_id = ?')
-      .run(userId);
-
+    const result = db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').run(userId);
     return result.changes;
   } finally {
     db.close();
   }
 }
 
-/**
- * 期限切れのリフレッシュトークンを削除
- */
 export function cleanupExpiredRefreshTokens(): number {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   try {
-    const result = db
-      .prepare('DELETE FROM refresh_tokens WHERE expires_at < ?')
-      .run(now);
-
+    const result = db.prepare('DELETE FROM refresh_tokens WHERE expires_at < ?').run(now);
     return result.changes;
   } finally {
     db.close();

@@ -6,7 +6,7 @@ import { Router, Response } from 'express';
 import {
   getSession,
   saveMessage,
-  updateSessionModel,
+
   deleteLastAssistantMessage,
   deleteSecondLastAssistantMessage,
   getRetryAssistantMessages,
@@ -116,11 +116,8 @@ router.post('/send', authMiddleware, async (req: AuthenticatedRequest, res: Resp
       return;
     }
 
-    // モデルが指定されていれば更新
-    const currentModel = model || sessionData.session.model;
-    if (model && model !== sessionData.session.model) {
-      updateSessionModel(sessionId, model);
-    }
+    // モデルはpsets_currentから取得
+    const currentModel = model || sessionData.model;
 
     // プロジェクトパスを取得
     const projectPath = sessionData.session.project_path || null;
