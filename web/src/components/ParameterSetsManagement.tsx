@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getPsetsTemplates, disablePsetsTemplate, updatePsetsTemplate, updatePsetsTemplateSortOrder, getModels } from '../api/client';
 import type { PsetsTemplate, Model } from '../types';
 import { ParameterSetForm } from './ParameterSetForm';
-import './ModesManagement.css';
+
 
 export function ParameterSetsManagement({ onNavigateToChat }: { onNavigateToChat: () => void }) {
   const [templates, setTemplates] = useState<PsetsTemplate[]>([]);
@@ -126,39 +126,43 @@ export function ParameterSetsManagement({ onNavigateToChat }: { onNavigateToChat
 
   if (loading) {
     return (
-      <div className="modes-management">
-        <div className="loading">
-          <div className="spinner"></div>
-          <p>読み込み中...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-screen bg-[#1a1a2e] text-[#888]">
+        <div className="w-10 h-10 border-4 border-[#333] border-t-[#4a9eff] rounded-full animate-spin mb-4"></div>
+        <p>読み込み中...</p>
       </div>
     );
   }
 
   return (
-    <div className="modes-management">
-      <div className="modes-header">
-        <div className="modes-header-left">
-          <button className="btn-back" onClick={onNavigateToChat}>← チャットに戻る</button>
-          <h2>パラメータセット管理</h2>
+    <div className="min-h-screen bg-[#1a1a2e] text-white p-6">
+      {/* ヘッダー */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-4">
+          <button onClick={onNavigateToChat} className="px-3 py-2 bg-[#16213e] border border-[#333] text-[#ccc] rounded-md text-sm hover:bg-[#1a1a2e] hover:text-white transition-colors">
+            ← チャットに戻る
+          </button>
+          <h2 className="text-2xl font-semibold text-white m-0">パラメータセット管理</h2>
         </div>
-        <button className="btn-primary" onClick={handleCreate}>新しいテンプレートを作成</button>
+        <button onClick={handleCreate} className="px-4 py-2 bg-[#4a9eff] text-white rounded-md text-sm hover:bg-[#3a8eef] transition-colors">
+          新しいテンプレートを作成
+        </button>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="bg-[#ff4444]/20 border border-[#ff4444] text-[#ff6666] px-3 py-2 rounded-md mb-4 text-sm">{error}</div>}
 
-      <div className="modes-table-container">
-        <table className="modes-table">
+      {/* テーブル */}
+      <div className="bg-[#16213e] rounded-xl border border-[#333] overflow-hidden">
+        <table className="w-full border-collapse">
           <thead>
-            <tr>
-              <th></th>
-              <th>アイコン</th>
-              <th>名前</th>
-              <th>モデル</th>
-              <th>公開</th>
-              <th>有効</th>
-              <th>バージョン</th>
-              <th>操作</th>
+            <tr className="bg-[#0f0f23] text-[#888] text-sm">
+              <th className="px-3 py-3 text-left w-8"></th>
+              <th className="px-3 py-3 text-left">アイコン</th>
+              <th className="px-3 py-3 text-left">名前</th>
+              <th className="px-3 py-3 text-left">モデル</th>
+              <th className="px-3 py-3 text-center">公開</th>
+              <th className="px-3 py-3 text-center">有効</th>
+              <th className="px-3 py-3 text-center">バージョン</th>
+              <th className="px-3 py-3 text-left">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -170,32 +174,26 @@ export function ParameterSetsManagement({ onNavigateToChat }: { onNavigateToChat
                 onDragEnter={() => handleDragEnter(index)}
                 onDragEnd={handleDragEnd}
                 onDragOver={(e) => e.preventDefault()}
-                className={`draggable-row ${!template.enabled ? 'row-disabled' : ''}`}
+                className={`border-t border-[#333] transition-colors hover:bg-[#1a1a2e] ${!template.enabled ? 'opacity-50' : ''}`}
               >
-                <td className="drag-handle">⠿</td>
-                <td className="mode-icon">{template.icon || '🤖'}</td>
-                <td className="mode-display-name">{template.psets_name}</td>
-                <td className="mode-description">{template.model || '-'}</td>
-                <td>{template.visibility === 'public' ? '公開' : '非公開'}</td>
-                <td>{template.enabled ? '✓' : '✗'}</td>
-                <td>v{template.version}</td>
-                <td className="mode-actions">
-                  <button className="btn-small btn-secondary" onClick={() => handleEdit(template)}>
-                    編集
-                  </button>
-                  <button className="btn-small btn-secondary" onClick={() => handleCopy(template)}>
-                    コピー
-                  </button>
-                  <button
-                    className={`btn-small ${template.enabled ? 'btn-danger' : 'btn-secondary'}`}
-                    onClick={() => setConfirmDialog({
-                      id: template.id,
-                      action: template.enabled ? 'disable' : 'enable',
-                      name: template.psets_name,
-                    })}
-                  >
-                    {template.enabled ? '無効化' : '有効化'}
-                  </button>
+                <td className="px-3 py-3 text-[#555] cursor-grab text-lg">⠿</td>
+                <td className="px-3 py-3 text-xl">{template.icon || '🤖'}</td>
+                <td className="px-3 py-3 text-sm text-white">{template.psets_name}</td>
+                <td className="px-3 py-3 text-sm text-[#888]">{template.model || '-'}</td>
+                <td className="px-3 py-3 text-center text-sm text-[#888]">{template.visibility === 'public' ? '公開' : '非公開'}</td>
+                <td className="px-3 py-3 text-center">{template.enabled ? <span className="text-green-400">✓</span> : <span className="text-[#555]">✗</span>}</td>
+                <td className="px-3 py-3 text-center text-sm text-[#888]">v{template.version}</td>
+                <td className="px-3 py-3">
+                  <div className="flex gap-2">
+                    <button onClick={() => handleEdit(template)} className="px-3 py-1 bg-[#333] text-white rounded text-xs hover:bg-[#444] transition-colors">編集</button>
+                    <button onClick={() => handleCopy(template)} className="px-3 py-1 bg-[#333] text-white rounded text-xs hover:bg-[#444] transition-colors">コピー</button>
+                    <button
+                      onClick={() => setConfirmDialog({ id: template.id, action: template.enabled ? 'disable' : 'enable', name: template.psets_name })}
+                      className={`px-3 py-1 rounded text-xs transition-colors ${template.enabled ? 'bg-[#dc3545] text-white hover:bg-[#c82333]' : 'bg-[#333] text-[#888] hover:bg-[#444]'}`}
+                    >
+                      {template.enabled ? '無効化' : '有効化'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -203,7 +201,7 @@ export function ParameterSetsManagement({ onNavigateToChat }: { onNavigateToChat
         </table>
 
         {templates.length === 0 && (
-          <div className="empty-state">
+          <div className="text-center py-12 text-[#888]">
             <p>テンプレートがありません</p>
           </div>
         )}
@@ -221,22 +219,19 @@ export function ParameterSetsManagement({ onNavigateToChat }: { onNavigateToChat
 
       {/* 有効/無効確認ダイアログ */}
       {confirmDialog && (
-        <div className="modal-overlay" onClick={() => setConfirmDialog(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-[#16213e] rounded-xl p-6 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-white font-semibold mb-3">
               {confirmDialog.action === 'disable' ? '🚫 無効化の確認' : '✅ 有効化の確認'}
             </h3>
-            <p style={{ color: '#ccc', marginBottom: '1.5rem' }}>
-              「{confirmDialog.name}」を
-              {confirmDialog.action === 'disable' ? '無効化' : '有効化'}しますか？
+            <p className="text-[#ccc] text-sm mb-6">
+              「{confirmDialog.name}」を{confirmDialog.action === 'disable' ? '無効化' : '有効化'}しますか？
             </p>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setConfirmDialog(null)}>
-                キャンセル
-              </button>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setConfirmDialog(null)} className="px-4 py-2 bg-[#333] text-white rounded-md text-sm hover:bg-[#444] transition-colors">キャンセル</button>
               <button
-                className={confirmDialog.action === 'disable' ? 'btn-danger' : 'btn-primary'}
                 onClick={handleToggleEnabled}
+                className={`px-4 py-2 rounded-md text-sm text-white transition-colors ${confirmDialog.action === 'disable' ? 'bg-[#dc3545] hover:bg-[#c82333]' : 'bg-[#4a9eff] hover:bg-[#3a8eef]'}`}
               >
                 {confirmDialog.action === 'disable' ? '無効化する' : '有効化する'}
               </button>

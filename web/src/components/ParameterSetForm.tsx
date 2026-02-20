@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { createPsetsTemplate, updatePsetsTemplate } from '../api/client';
 import type { PsetsTemplate, Model } from '../types';
-import './ModeForm.css';
+
 
 // アイコン選択肢
 const ICON_OPTIONS = [
@@ -143,38 +143,34 @@ export function ParameterSetForm({ template, isCopy = false, models, onClose, on
   const isEdit = template !== null && !isCopy;
   const title = isCopy ? 'テンプレートをコピー' : isEdit ? 'テンプレートを編集' : '新しいテンプレートを作成';
 
+  // 共通の入力スタイル
+  const inputCls = "w-full px-3 py-2 bg-[#0f0f23] border border-[#333] rounded-md text-white text-sm focus:outline-none focus:border-[#4a9eff]";
+  const labelCls = "block text-[#ccc] text-sm font-medium mb-1";
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content modal-content-wide" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button className="modal-close" onClick={onClose}>×</button>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4" onClick={onClose}>
+      <div className="bg-[#16213e] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+        {/* ヘッダー */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-[#333]">
+          <h3 className="text-lg font-semibold text-white m-0">{title}</h3>
+          <button className="text-[#888] hover:text-white hover:bg-[#333] w-8 h-8 flex items-center justify-center rounded text-xl transition-colors" onClick={onClose}>×</button>
         </div>
 
-        <form className="mode-form" onSubmit={handleSubmit}>
-          {error && <div className="error-message">{error}</div>}
+        <form className="p-6" onSubmit={handleSubmit}>
+          {error && <div className="bg-[#ff4444]/20 border border-[#ff4444] text-[#ff6666] px-3 py-2 rounded-md mb-4 text-sm">{error}</div>}
 
           {/* 基本情報 */}
-          <div className="form-section">
-            <h4 className="form-section-title">基本情報</h4>
+          <div className="mb-6">
+            <h4 className="text-[#4a9eff] text-sm font-semibold uppercase tracking-wider mb-4 pb-2 border-b border-[#333]">基本情報</h4>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="psets_name">名前 <span className="required">*</span></label>
-                <input
-                  type="text"
-                  id="psets_name"
-                  name="psets_name"
-                  value={formData.psets_name}
-                  onChange={handleChange}
-                  required
-                  placeholder="例: あなたの本職を支援"
-                />
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="psets_name" className={labelCls}>名前 <span className="text-[#ff4444]">*</span></label>
+                <input type="text" id="psets_name" name="psets_name" value={formData.psets_name} onChange={handleChange} required placeholder="例: あなたの本職を支援" className={inputCls} />
               </div>
-
-              <div className="form-group">
-                <label htmlFor="icon">アイコン</label>
-                <select id="icon" name="icon" value={formData.icon} onChange={handleChange} className="icon-select">
+              <div>
+                <label htmlFor="icon" className={labelCls}>アイコン</label>
+                <select id="icon" name="icon" value={formData.icon} onChange={handleChange} className={inputCls}>
                   <option value="">選択してください</option>
                   {ICON_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -183,19 +179,18 @@ export function ParameterSetForm({ template, isCopy = false, models, onClose, on
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="visibility">公開範囲</label>
-                <select id="visibility" name="visibility" value={formData.visibility} onChange={handleChange}>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="visibility" className={labelCls}>公開範囲</label>
+                <select id="visibility" name="visibility" value={formData.visibility} onChange={handleChange} className={inputCls}>
                   <option value="private">プライベート</option>
                   <option value="public">パブリック</option>
                 </select>
               </div>
-
               {isEdit && (
-                <div className="form-group">
-                  <label htmlFor="enabled">有効</label>
-                  <select id="enabled" name="enabled" value={formData.enabled} onChange={handleChange}>
+                <div>
+                  <label htmlFor="enabled" className={labelCls}>有効</label>
+                  <select id="enabled" name="enabled" value={formData.enabled} onChange={handleChange} className={inputCls}>
                     <option value={1}>有効</option>
                     <option value={0}>無効</option>
                   </select>
@@ -203,26 +198,19 @@ export function ParameterSetForm({ template, isCopy = false, models, onClose, on
               )}
             </div>
 
-            <div className="form-group">
-              <label htmlFor="description">説明</label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={2}
-                placeholder="このテンプレートの簡単な説明"
-              />
+            <div>
+              <label htmlFor="description" className={labelCls}>説明</label>
+              <textarea id="description" name="description" value={formData.description} onChange={handleChange} rows={2} placeholder="このテンプレートの簡単な説明" className={inputCls} />
             </div>
           </div>
 
           {/* モデル・システムプロンプト */}
-          <div className="form-section">
-            <h4 className="form-section-title">モデル・システムプロンプト</h4>
+          <div className="mb-6">
+            <h4 className="text-[#4a9eff] text-sm font-semibold uppercase tracking-wider mb-4 pb-2 border-b border-[#333]">モデル・システムプロンプト</h4>
 
-            <div className="form-group">
-              <label htmlFor="model">モデル <span className="required">*</span></label>
-              <select id="model" name="model" value={formData.model} onChange={handleChange} required>
+            <div className="mb-4">
+              <label htmlFor="model" className={labelCls}>モデル <span className="text-[#ff4444]">*</span></label>
+              <select id="model" name="model" value={formData.model} onChange={handleChange} required className={inputCls}>
                 <option value="">モデルを選択してください</option>
                 {models.map((m) => (
                   <option key={m.name} value={m.name}>{m.name}</option>
@@ -230,114 +218,49 @@ export function ParameterSetForm({ template, isCopy = false, models, onClose, on
               </select>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="system_prompt">システムプロンプト</label>
+            <div>
+              <label htmlFor="system_prompt" className={labelCls}>システムプロンプト</label>
               <textarea
-                id="system_prompt"
-                name="system_prompt"
-                value={formData.system_prompt}
-                onChange={handleChange}
-                rows={10}
+                id="system_prompt" name="system_prompt" value={formData.system_prompt} onChange={handleChange} rows={10}
                 placeholder="LLMに送信される初期指示。空の場合はデフォルトの動作になります。"
-                className="code-textarea"
+                className={`${inputCls} font-mono text-xs resize-y min-h-[200px]`}
               />
             </div>
           </div>
 
           {/* LLM パラメータ */}
-          <div className="form-section">
-            <h4 className="form-section-title">LLM パラメータ</h4>
+          <div className="mb-6">
+            <h4 className="text-[#4a9eff] text-sm font-semibold uppercase tracking-wider mb-4 pb-2 border-b border-[#333]">LLM パラメータ</h4>
 
-            <div className="form-group">
-              <label>
-                最大トークン数
-                <span className="param-value">
-                  {formData.max_tokens === 0 ? 'モデルのデフォルト' : formData.max_tokens}
-                </span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={8192}
-                step={128}
-                value={formData.max_tokens}
-                onChange={(e) => handleSliderChange('max_tokens', parseInt(e.target.value))}
-                className="param-slider"
-              />
-              <div className="slider-labels">
-                <span>デフォルト (0)</span>
-                <span>8192</span>
+            {[
+              { name: 'max_tokens', label: '最大トークン数', min: 0, max: 8192, step: 128, display: formData.max_tokens === 0 ? 'モデルのデフォルト' : formData.max_tokens, leftLabel: 'デフォルト (0)', rightLabel: '8192', isInt: true },
+              { name: 'context_messages', label: '参照メッセージ数', min: 0, max: 50, step: 1, display: formData.context_messages === 0 ? '無制限' : formData.context_messages, leftLabel: '無制限 (0)', rightLabel: '50', isInt: true },
+              { name: 'temperature', label: 'Temperature', min: 0, max: 1, step: 0.01, display: formData.temperature.toFixed(2), leftLabel: '0.0（確実）', rightLabel: '1.0（創造的）', isInt: false },
+              { name: 'top_p', label: 'Top-p', min: 0, max: 1, step: 0.01, display: formData.top_p.toFixed(2), leftLabel: '0.0', rightLabel: '1.0', isInt: false },
+            ].map(({ name, label, min, max, step, display, leftLabel, rightLabel, isInt }) => (
+              <div key={name} className="mb-4">
+                <label className={`${labelCls} flex justify-between`}>
+                  <span>{label}</span>
+                  <span className="text-[#4a9eff] font-mono">{display}</span>
+                </label>
+                <input
+                  type="range" min={min} max={max} step={step}
+                  value={formData[name as keyof FormData] as number}
+                  onChange={(e) => handleSliderChange(name, isInt ? parseInt(e.target.value) : parseFloat(e.target.value))}
+                  className="w-full accent-[#4a9eff]"
+                />
+                <div className="flex justify-between text-xs text-[#666] mt-1">
+                  <span>{leftLabel}</span><span>{rightLabel}</span>
+                </div>
               </div>
-            </div>
-
-            <div className="form-group">
-              <label>
-                参照メッセージ数
-                <span className="param-value">
-                  {formData.context_messages === 0 ? '無制限' : formData.context_messages}
-                </span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={50}
-                step={1}
-                value={formData.context_messages}
-                onChange={(e) => handleSliderChange('context_messages', parseInt(e.target.value))}
-                className="param-slider"
-              />
-              <div className="slider-labels">
-                <span>無制限 (0)</span>
-                <span>50</span>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>
-                Temperature
-                <span className="param-value">{formData.temperature.toFixed(2)}</span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={formData.temperature}
-                onChange={(e) => handleSliderChange('temperature', parseFloat(e.target.value))}
-                className="param-slider"
-              />
-              <div className="slider-labels">
-                <span>0.0（確実）</span>
-                <span>1.0（創造的）</span>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>
-                Top-p
-                <span className="param-value">{formData.top_p.toFixed(2)}</span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={formData.top_p}
-                onChange={(e) => handleSliderChange('top_p', parseFloat(e.target.value))}
-                className="param-slider"
-              />
-              <div className="slider-labels">
-                <span>0.0</span>
-                <span>1.0</span>
-              </div>
-            </div>
+            ))}
           </div>
 
-          <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
+          <div className="flex gap-3 justify-end pt-4 border-t border-[#333]">
+            <button type="button" onClick={onClose} disabled={loading} className="px-4 py-2 bg-[#333] text-white rounded-md text-sm hover:bg-[#444] disabled:opacity-50 transition-colors">
               キャンセル
             </button>
-            <button type="submit" className="btn-primary" disabled={loading}>
+            <button type="submit" disabled={loading} className="px-4 py-2 bg-[#4a9eff] text-white rounded-md text-sm hover:bg-[#3a8eef] disabled:opacity-50 transition-colors">
               {loading ? '保存中...' : isEdit ? '更新' : '作成'}
             </button>
           </div>
