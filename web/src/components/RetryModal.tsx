@@ -16,28 +16,25 @@ export function RetryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal retry-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>🔄 別のモデルで再試行</h3>
-        <p>使用するモデルを選択してください</p>
-        <div className="model-list">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]" onClick={onClose}>
+      <div className="bg-[#16213e] rounded-xl p-6 w-full max-w-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-white font-semibold mb-2">🔄 別のモデルで再試行</h3>
+        <p className="text-[#888] text-sm mb-4">使用するモデルを選択してください</p>
+        <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
           {models.map((model) => (
             <button
               key={model.name}
-              className={`model-item ${model.name === currentModel ? 'current' : ''}`}
-              onClick={() => {
-                onRetry(model.name);
-                onClose();
-              }}
+              className={`flex items-center gap-3 px-4 py-3 bg-[#1a1a2e] border rounded-md cursor-pointer text-left text-white transition-colors hover:bg-[#252540] hover:border-[#4a9eff] ${model.name === currentModel ? 'border-[#4a9eff] bg-[#1a2a4e]' : 'border-[#333]'}`}
+              onClick={() => { onRetry(model.name); onClose(); }}
             >
-              <span className="model-name">{model.name}</span>
-              <span className="model-size">{model.sizeFormatted}</span>
-              {model.name === currentModel && <span className="current-badge">現在</span>}
+              <span className="flex-1 font-medium text-sm">{model.name}</span>
+              <span className="text-[#888] text-sm">{model.sizeFormatted}</span>
+              {model.name === currentModel && <span className="bg-[#4a9eff] text-white text-xs px-2 py-0.5 rounded">現在</span>}
             </button>
           ))}
         </div>
-        <div className="modal-actions">
-          <button onClick={onClose}>キャンセル</button>
+        <div className="flex justify-end mt-4">
+          <button onClick={onClose} className="px-4 py-2 bg-[#333] text-white rounded-md text-sm hover:bg-[#444] transition-colors">キャンセル</button>
         </div>
       </div>
     </div>

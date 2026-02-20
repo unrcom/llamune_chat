@@ -15,7 +15,7 @@ import { SystemPromptBlock } from './SystemPromptBlock';
 import { RetryModal } from './RetryModal';
 import { AnswerSelector } from './AnswerSelector';
 import { DirectoryTreeModal } from './DirectoryTreeModal';
-import './Chat.css';
+
 
 export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const { user, logout } = useAuth();
@@ -528,379 +528,314 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     -1
   );
 
+
+  // 共通スタイル
+  const inputCls = "w-full px-3 py-2 bg-[#0f0f23] border border-[#333] rounded-md text-white text-sm focus:outline-none focus:border-[#4a9eff]";
+
   return (
-    <div className="chat-container">
+    <div className="flex h-screen bg-[#1a1a2e] text-white">
+
       {/* サイドバー */}
-      <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
-        <div className="sidebar-header">
-          <div className="sidebar-header-top">
+      <aside className={`bg-[#16213e] flex flex-col border-r border-[#333] transition-all duration-300 z-10 relative ${isSidebarOpen ? 'w-[280px]' : 'w-0 -translate-x-[280px] overflow-hidden'}`}>
+        <div className="p-4 border-b border-[#333]">
+          <div className="flex items-center gap-2 mb-4">
             <button
-              className="sidebar-toggle-btn"
+              className="bg-transparent border-none text-[#888] text-xl cursor-pointer px-2 py-1 rounded hover:bg-[#333] hover:text-white transition-colors"
               onClick={() => setIsSidebarOpen(false)}
-              title="サイドバーを閉じる"
             >
               ☰
             </button>
-            <h2 className="sidebar-logo">llamune_chat</h2>
+            <h2 className="m-0 text-lg text-[#4a9eff] font-semibold flex-1">llamune_chat</h2>
           </div>
-          <button className="new-chat-btn" onClick={() => setShowNewChat(true)}>
+          <button className="w-full py-3 bg-[#4a9eff] text-white border-none rounded-md cursor-pointer text-sm hover:bg-[#3a8eef] transition-colors" onClick={() => setShowNewChat(true)}>
             + 新しいチャット
           </button>
-          <button className="modes-btn" onClick={onNavigateToModes}>
+          <button className="w-full py-3 mt-2 bg-transparent text-[#888] border border-[#444] rounded-md cursor-pointer text-sm hover:bg-[#333] hover:text-[#4a9eff] hover:border-[#4a9eff] transition-colors" onClick={onNavigateToModes}>
             ⚙️ パラメータセット管理
           </button>
-          <button className="import-btn" onClick={handleImportClick}>
-            📤 インポート
+          <button className="w-full py-3 mt-2 bg-transparent text-[#888] border border-[#444] rounded-md cursor-pointer text-sm hover:bg-[#333] hover:text-white hover:border-[#666] transition-colors" onClick={handleImportClick}>
+            📥 インポート
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            style={{ display: 'none' }}
-            onChange={handleFileImport}
-          />
         </div>
 
-        <div className="sessions-list">
+        {/* セッション一覧 */}
+        <div className="flex-1 overflow-y-auto p-2">
           {sessions.map(session => (
             <div
               key={session.id}
-              className={`session-item ${currentSession === session.id ? 'active' : ''}`}
+              className={`group flex justify-between items-center px-3 py-3 rounded-md cursor-pointer mb-1 relative transition-colors hover:bg-[#1a1a2e] ${currentSession === session.id ? 'bg-[#4a9eff33]' : ''}`}
               onClick={() => setCurrentSession(session.id)}
             >
-              <>
-                <div className="session-info-row">
-                  <button
-                    className="session-info-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setHoverInfoSessionId(
-                        hoverInfoSessionId === session.id ? null : session.id
-                      );
-                    }}
-                  >
-                    {session.psets_icon || '🔵'}
-                  </button>
-                    {hoverInfoSessionId === session.id && (
-                      <div className="session-info-tooltip">
-                        <div className="tooltip-row">
-                          <span className="tooltip-label">📅 日付:</span>
-                          <span>{session.created_at ? formatDate(session.created_at) : '(不明)'}</span>
-                        </div>
-                        <div className="tooltip-row">
-                          <span className="tooltip-label">🎯 パラメータセット:</span>
-                          <span>{session.psets_icon || ''} {session.psets_name || '(なし)'}</span>
-                        </div>
-                        <div className="tooltip-row">
-                          <span className="tooltip-label">🤖 LLM:</span>
-                          <span>{session.model || '(不明)'}</span>
-                        </div>
-                        <div className="tooltip-row">
-                          <span className="tooltip-label">📁 プロジェクト:</span>
-                          <span className="tooltip-path">{session.project_path || '(なし)'}</span>
-                        </div>
-                        <div className="tooltip-row">
-                          <span className="tooltip-label">💬 チャット数:</span>
-                          <span>{session.message_count ?? 0}</span>
-                        </div>
+              <div className="flex items-center flex-1 min-w-0">
+                <button
+                  className="bg-none border-none p-0 cursor-pointer text-base leading-none mr-2 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); setHoverInfoSessionId(hoverInfoSessionId === session.id ? null : session.id); }}
+                >
+                  {session.psets_icon || '🔵'}
+                </button>
+                {hoverInfoSessionId === session.id && (
+                  <div className="absolute left-0 top-full mt-2 bg-[#1a1a2e] border border-[#444] rounded-md p-3 w-[280px] z-[1000] shadow-lg">
+                    {[
+                      { label: '📅 日付:', value: session.created_at ? formatDate(session.created_at) : '(不明)' },
+                      { label: '🎯 パラメータセット:', value: `${session.psets_icon || ''} ${session.psets_name || '(なし)'}` },
+                      { label: '🤖 LLM:', value: session.model || '(不明)' },
+                      { label: '📁 プロジェクト:', value: session.project_path || '(なし)', mono: true },
+                      { label: '💬 チャット数:', value: String(session.message_count ?? 0) },
+                    ].map(({ label, value, mono }) => (
+                      <div key={label} className="flex gap-2 text-xs mb-1 text-[#ccc] items-start">
+                        <span className="text-[#888] whitespace-nowrap shrink-0">{label}</span>
+                        <span className={`break-all ${mono ? 'font-mono text-[0.7rem]' : ''}`}>{value}</span>
                       </div>
-                    )}
+                    ))}
                   </div>
-                  <span className="session-title">
-                    {currentSession === session.id && '⭐ '}
-                    {session.title || '(無題)'}
-                  </span>
-                  <div className="session-actions">
-                    <button
-                      className="session-action-btn export-btn"
-                      onClick={(e) => handleExportSession(session.id, e)}
-                      title="エクスポート"
-                    >
-                      📥
-                    </button>
-                    <button
-                      className="session-action-btn edit-btn"
-                      onClick={(e) => openSessionEditModal(session, e)}
-                      title="編集"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="session-action-btn delete-btn"
-                      onClick={(e) => handleDeleteSession(session.id, e)}
-                      title="削除"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </>
+                )}
+                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
+                  {currentSession === session.id && '⭐ '}
+                  {session.title || '(無題)'}
+                </span>
               </div>
-            ))}
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity session-actions-hover">
+                <button className="bg-none border-none cursor-pointer p-1 text-sm opacity-70 hover:opacity-100 transition-opacity" onClick={(e) => handleExportSession(session.id, e)} title="エクスポート">📥</button>
+                <button className="bg-none border-none cursor-pointer p-1 text-sm opacity-70 hover:opacity-100 transition-opacity" onClick={(e) => openSessionEditModal(session, e)} title="編集">✏️</button>
+                <button className="bg-none border-none cursor-pointer p-1 text-sm opacity-70 hover:opacity-100 hover:text-[#ff4444] transition-colors" onClick={(e) => handleDeleteSession(session.id, e)} title="削除">🗑️</button>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="sidebar-footer">
-          <div className="user-info">
+        <div className="p-4 border-t border-[#333]">
+          <div className="flex justify-between items-center text-sm text-[#888]">
             <span>👤 {user?.username}</span>
-            <button onClick={logout}>ログアウト</button>
+            <button onClick={logout} className="bg-none border-none text-[#4a9eff] cursor-pointer text-sm hover:underline">ログアウト</button>
           </div>
         </div>
       </aside>
 
       {/* メインエリア */}
-      <main className="main-area">
+      <main className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
         {!isSidebarOpen && (
           <button
-            className="sidebar-open-btn"
+            className="fixed top-4 left-4 z-[100] bg-[#16213e] border border-[#333] text-[#888] text-xl cursor-pointer px-3 py-2 rounded-md hover:bg-[#1a1a2e] hover:text-[#4a9eff] hover:border-[#4a9eff] transition-colors shadow-md"
             onClick={() => setIsSidebarOpen(true)}
-            title="サイドバーを開く"
           >
             ☰
           </button>
         )}
 
         {/* インポート閲覧モード */}
-        {importedData ? (
+        {importedData && (
           <>
-            <div className="import-header">
-              <div className="import-info">
-                <span className="import-badge">📖 閲覧モード</span>
-                <span className="import-title">{importedData.session.title || '(無題)'}</span>
-                <span className="import-meta">
-                  {importedData.session.model} | {importedData.session.created_at ? new Date(importedData.session.created_at).toLocaleDateString() : ''} | {importedData.messages.length}件
+            <div className="flex justify-between items-center px-4 py-3 bg-[#2a3a5e] border-b border-[#4a9eff]">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="bg-[#4a9eff] text-white px-3 py-1 rounded text-sm font-medium">📖 閲覧モード</span>
+                <span className="text-white font-medium">{importedData.session.title || '(無題)'}</span>
+                <span className="text-[#888] text-sm">
+                  {importedData.messages.length} メッセージ
+                  {importedData.session.created_at && ` • ${formatDate(importedData.session.created_at)}`}
                 </span>
               </div>
-              <button className="import-close-btn" onClick={closeImportView}>
-                ✕ 閉じる
+              <button className="bg-transparent border border-[#666] text-[#888] px-4 py-2 rounded-md text-sm hover:bg-[#dc3545] hover:border-[#dc3545] hover:text-white transition-colors" onClick={closeImportView}>
+                閲覧を終了
               </button>
             </div>
-            <div className="messages">
-              {importedData.session.systemPrompt && (
-                <SystemPromptBlock
-                  systemPrompt={importedData.session.systemPrompt}
-                  model={importedData.session.model}
-                />
-              )}
-              {importedData.messages.map((msg, i) => {
-                const isKeptOnly = msg.role === 'assistant' && msg.is_adopted === false;
-                return (
-                  <div key={i} className={`message ${msg.role} ${isKeptOnly ? 'kept-only' : ''}`}>
-                    <div className="message-header">
-                      <div className="message-role">
-                        {msg.role === 'user' ? '👤 You' : (
-                        <>🤖 AI{msg.model && <span className="message-model-inline"> {msg.model}</span>}</>
-                      )}
-                      {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
-                      </div>
-                    </div>
-                    {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                    <div className="message-content markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                    </div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+              {importedData.messages.map((msg, i) => (
+                <div key={i} className={`mb-4 max-w-[80%] overflow-hidden ${msg.role === 'user' ? 'ml-auto' : 'mr-auto'}`}>
+                  <div className="text-xs text-[#888] mb-1">{msg.role === 'user' ? '👤 You' : '🤖 AI'}</div>
+                  <div className={`p-4 rounded-xl break-words leading-relaxed ${msg.role === 'user' ? 'bg-[#4a9eff33]' : 'bg-[#16213e]'}`}>
+                    <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
                   </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
+                </div>
+              ))}
             </div>
           </>
-        ) : (currentSession || pendingNewChat) ? (
+        )}
+
+        {/* 通常チャットモード */}
+        {!importedData && (currentSession || pendingNewChat) && (
           <>
-            <div
-              className="messages"
-              ref={messagesContainerRef}
-              onScroll={handleMessagesScroll}
-            >
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4">
               {systemPrompt && (
                 <SystemPromptBlock
                   systemPrompt={systemPrompt}
-                  psetsIcon={psetsIcon || undefined}
-                  psetsName={psetsName || undefined}
-                  model={sessionModel || undefined}
+                  psetsIcon={psetsIcon ?? undefined}
+                  psetsName={psetsName ?? undefined}
+                  model={sessionModel ?? undefined}
                 />
               )}
               {messages.map((msg, i) => {
+                const isKeptOnly = msg.is_adopted === false;
                 if (retryPending && i === lastAssistantIndex && msg.role === 'assistant') {
                   return null;
                 }
-
                 const isLastAssistant = i === lastAssistantIndex && msg.role === 'assistant';
-                const isKeptOnly = msg.role === 'assistant' && msg.is_adopted === false;
-
                 return (
-                  <div key={i} className={`message ${msg.role} ${isKeptOnly ? 'kept-only' : ''}`}>
-                    <div className="message-header">
-                      <div className="message-role">
-                        {msg.role === 'user' ? '👤 You' : (
-                        <>🤖 AI{msg.model && <span className="message-model-inline"> {msg.model}</span>}</>
-                      )}
-                      {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
-                      </div>
+                  <div key={i} className={`mb-4 max-w-[80%] overflow-hidden ${msg.role === 'user' ? 'ml-auto' : 'mr-auto'} ${isKeptOnly ? 'opacity-70' : ''}`}>
+                    <div className="text-xs text-[#888] mb-1 flex items-center gap-2">
+                      {msg.role === 'user'
+                        ? '👤 You'
+                        : <><span>🤖 AI{msg.model && <span className="text-xs text-[#6c757d] font-normal ml-1">{msg.model}</span>}</span></>
+                      }
+                      {isKeptOnly && <span className="ml-2 text-xs bg-yellow-400 text-black px-1.5 py-0.5 rounded font-medium">📋 履歴のみ</span>}
                     </div>
-                    {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                    <div className="message-content markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    <div className={`p-4 rounded-xl break-words leading-relaxed ${msg.role === 'user' ? 'bg-[#4a9eff33]' : `bg-[#16213e] ${isKeptOnly ? 'border border-dashed border-[#555]' : ''}`}`}>
+                      {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
+                      <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
                     </div>
                     {isLastAssistant && !loading && !isRetrying && !retryPending && (
                       <button
-                        className="retry-btn"
+                        className="mt-2 px-3 py-1 bg-transparent border border-[#444] rounded text-[#888] text-xs cursor-pointer hover:bg-[#333] hover:text-white hover:border-[#555] transition-colors"
                         onClick={() => setShowRetryModal(true)}
                       >
-                        🔄 Retry
+                        🔄 別モデルで再試行
                       </button>
                     )}
                   </div>
                 );
               })}
 
-              {/* 回答選択ビュー（複数候補対応） */}
               {retryPending && answerCandidates.length > 0 && (
                 <AnswerSelector
                   candidates={answerCandidates}
                   onConfirm={handleConfirmSelection}
                   onRetryMore={handleRetryMore}
-                  isRetrying={isRetrying}
-                  maxCandidates={MAX_CANDIDATES}
+                  isRetrying={loading}
                 />
               )}
 
               {/* ストリーミング中（通常送信） */}
               {loading && !isRetrying && (
-                <div className="message assistant">
-                  <div className="message-role">🤖 AI</div>
-                  {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  {streamingContent ? (
-                    <div className="message-content markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <LoadingIndicator message={streamingThinking ? '回答を作成中...' : '思考中...'} />
-                  )}
+                <div className="mb-4 max-w-[80%] mr-auto">
+                  <div className="text-xs text-[#888] mb-1">🤖 AI</div>
+                  <div className="p-4 rounded-xl bg-[#16213e] break-words leading-relaxed">
+                    {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
+                    {streamingContent ? (
+                      <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown></div>
+                    ) : (
+                      <LoadingIndicator message={streamingThinking ? '回答を作成中...' : '思考中...'} />
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* リトライ中のストリーミング */}
               {isRetrying && (
-                <div className="message assistant streaming-retry">
-                  <div className="message-role">🤖 AI (リトライ中)</div>
-                  {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  {streamingContent ? (
-                    <div className="message-content markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <LoadingIndicator message={streamingThinking ? '回答を作成中...' : '別のモデルで思考中...'} />
-                  )}
+                <div className="mb-4 max-w-[80%] mr-auto">
+                  <div className="text-xs text-[#888] mb-1">🤖 AI (リトライ中)</div>
+                  <div className="p-4 rounded-xl bg-[#1a2a1a] border border-[#2a4a2a] break-words leading-relaxed">
+                    {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
+                    {streamingContent ? (
+                      <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown></div>
+                    ) : (
+                      <LoadingIndicator message={streamingThinking ? '回答を作成中...' : '別のモデルで思考中...'} />
+                    )}
+                  </div>
                 </div>
               )}
-
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="input-area">
+            <div className="flex gap-2 p-4 border-t border-[#333]">
               <textarea
+                className="flex-1 px-3 py-3 border border-[#333] rounded-md bg-[#0f0f23] text-white text-base resize-none min-h-[60px] max-h-[200px] font-inherit focus:outline-none focus:border-[#4a9eff]"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="メッセージを入力..."
                 disabled={loading || isRetrying || retryPending}
               />
               {loading || isRetrying ? (
-                <button className="stop-btn" onClick={handleCancelStreaming}>
-                  ⏹️ 停止
+                <button className="px-6 py-3 bg-[#dc3545] text-white border-none rounded-md cursor-pointer text-base self-end hover:bg-[#c82333] transition-colors" onClick={handleCancelStreaming}>
+                  停止
                 </button>
               ) : (
-                <button onClick={handleSend} disabled={retryPending || !input.trim()}>
+                <button className="px-6 py-3 bg-[#4a9eff] text-white border-none rounded-md cursor-pointer text-base self-end hover:bg-[#3a8eef] disabled:bg-[#555] disabled:cursor-not-allowed transition-colors" onClick={handleSend} disabled={retryPending || !input.trim()}>
                   送信
                 </button>
               )}
             </div>
           </>
-        ) : (
-          <div className="no-session">
-            <h2>🔵 llamune_chat</h2>
-            <p>新しいチャットを開始するか、左のセッションを選択してください</p>
-            <button onClick={() => setShowNewChat(true)}>+ 新しいチャット</button>
+        )}
+
+        {/* セッション未選択 */}
+        {!importedData && !currentSession && !pendingNewChat && (
+          <div className="flex flex-col justify-center items-center h-full text-[#888]">
+            <h2 className="text-4xl mb-2 text-white">🔵 llamune_chat</h2>
+            <p className="mb-6">新しいチャットを開始するか、左のセッションを選択してください</p>
+            <button className="px-6 py-3 bg-[#4a9eff] text-white border-none rounded-md cursor-pointer text-base hover:bg-[#3a8eef] transition-colors" onClick={() => setShowNewChat(true)}>
+              + 新しいチャット
+            </button>
           </div>
         )}
       </main>
 
-      {/* 新しいチャットモーダル */}
+      {/* 新規チャットモーダル */}
       {showNewChat && (
-        <div className="modal-overlay" onClick={() => setShowNewChat(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>新しいチャット</h3>
-
-            <div className="form-group">
-              <label>パラメータセット</label>
-              <select
-                value={selectedTemplate || ''}
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  setSelectedTemplate(id);
-                  const tmpl = psetsTemplates.find(t => t.id === id);
-                  setSelectedModel(tmpl?.model || '');
-                }}
-              >
-                {psetsTemplates.map(template => (
-                  <option key={template.id} value={template.id}>
-                    {template.icon} {template.psets_name}
-                    {template.model ? ` — ${template.model}` : ''}
-                  </option>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]" onClick={() => setShowNewChat(false)}>
+          <div className="bg-[#16213e] p-6 rounded-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-white font-semibold mb-4">新しいチャット</h3>
+            <div className="mb-4">
+              <label className="block text-[#ccc] text-sm mb-2">パラメータセット</label>
+              <select className={inputCls} value={selectedTemplate ?? ''} onChange={(e) => setSelectedTemplate(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">なし（カスタム設定）</option>
+                {psetsTemplates.map(t => (
+                  <option key={t.id} value={t.id}>{t.icon} {t.psets_name}</option>
                 ))}
               </select>
             </div>
-
-            {/* テンプレートにモデル未設定の場合はモデル選択を表示 */}
-            {!psetsTemplates.find(t => t.id === selectedTemplate)?.model && (
-              <div className="form-group">
-                <label>モデル <span style={{color:'red'}}>*</span></label>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                >
-                  <option value="">モデルを選択してください</option>
+            {!selectedTemplate && (
+              <div className="mb-4">
+                <label className="block text-[#ccc] text-sm mb-2">モデル</label>
+                <select className={inputCls} value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
+                  <option value="">モデルを選択...</option>
                   {models.map(m => (
                     <option key={m.name} value={m.name}>{m.name}</option>
                   ))}
                 </select>
               </div>
             )}
-
-            {/* プロジェクトフォルダ選択 */}
-            <div className="form-group">
-              <label>プロジェクトフォルダ（オプション）</label>
-              <div className="project-path-selector">
-                <input
-                  type="text"
-                  value={selectedProjectPath || ''}
-                  readOnly
-                  placeholder="フォルダを選択..."
-                  className="project-path-input"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowDirectoryModal(true)}
-                  className="browse-btn"
-                >
-                  📁 参照
+            <div className="mb-4">
+              <label className="block text-[#ccc] text-sm mb-2">プロジェクトフォルダ（任意）</label>
+              <div className="flex gap-2 items-center">
+                <input type="text" readOnly value={selectedProjectPath ?? ''} placeholder="フォルダを選択..." className={`${inputCls} flex-1`} />
+                <button className="px-3 py-2 bg-[#333] border border-[#444] text-white rounded-md text-sm hover:bg-[#444] transition-colors whitespace-nowrap" onClick={() => setShowDirectoryModal(true)}>
+                  参照
                 </button>
                 {selectedProjectPath && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProjectPath(null)}
-                    className="clear-btn"
-                  >
-                    ×
+                  <button className="px-3 py-2 bg-[#333] border border-[#444] text-[#888] rounded-md text-sm hover:bg-[#444] hover:text-white transition-colors" onClick={() => setSelectedProjectPath('')}>
+                    ✕
                   </button>
                 )}
               </div>
             </div>
-
-            <div className="modal-actions">
-              <button onClick={() => { setShowNewChat(false); setSelectedProjectPath(null); }}>キャンセル</button>
-              <button onClick={handleNewChat} className="primary" disabled={!psetsTemplates.find(t => t.id === selectedTemplate)?.model && !selectedModel}>開始</button>
+            <div className="flex gap-2 justify-end mt-6">
+              <button className="px-4 py-2 bg-[#333] text-white rounded-md text-sm hover:bg-[#444] transition-colors" onClick={() => setShowNewChat(false)}>キャンセル</button>
+              <button
+                className="px-4 py-2 bg-[#4a9eff] text-white rounded-md text-sm hover:bg-[#3a8eef] disabled:bg-[#555] disabled:cursor-not-allowed transition-colors"
+                onClick={handleNewChat}
+                disabled={!psetsTemplates.find(t => t.id === selectedTemplate)?.model && !selectedModel}
+              >
+                開始
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* リトライモーダル */}
+      <RetryModal
+        isOpen={showRetryModal}
+        onClose={() => setShowRetryModal(false)}
+        models={models}
+        currentModel={sessionModel || ''}
+        onRetry={handleRetry}
+      />
+
+      {/* ディレクトリ選択モーダル */}
+      <DirectoryTreeModal
+        isOpen={showDirectoryModal}
+        onClose={() => setShowDirectoryModal(false)}
+        onSelect={(path) => { setSelectedProjectPath(path); setShowDirectoryModal(false); }}
+      />
 
       {/* セッション編集モーダル */}
       {editingSession && (
@@ -911,22 +846,6 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           onSave={handleSessionEditSave}
         />
       )}
-
-      {/* ディレクトリ選択モーダル */}
-      <DirectoryTreeModal
-        isOpen={showDirectoryModal}
-        onClose={() => setShowDirectoryModal(false)}
-        onSelect={(path) => setSelectedProjectPath(path)}
-      />
-
-      {/* リトライモーダル */}
-      <RetryModal
-        isOpen={showRetryModal}
-        onClose={() => setShowRetryModal(false)}
-        models={models}
-        currentModel={sessionModel || ''}
-        onRetry={handleRetry}
-      />
     </div>
   );
 }
