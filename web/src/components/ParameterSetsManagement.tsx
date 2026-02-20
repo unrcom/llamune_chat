@@ -31,7 +31,7 @@ export function ParameterSetsManagement({ onNavigateToChat }: { onNavigateToChat
     try {
       setLoading(true);
       setError(null);
-      const [tmpl, mdls] = await Promise.all([getPsetsTemplates(), getModels()]);
+      const [tmpl, mdls] = await Promise.all([getPsetsTemplates(false), getModels()]);
       setTemplates(tmpl);
       setModels(mdls);
     } catch (err) {
@@ -222,15 +222,15 @@ export function ParameterSetsManagement({ onNavigateToChat }: { onNavigateToChat
       {/* 有効/無効確認ダイアログ */}
       {confirmDialog && (
         <div className="modal-overlay" onClick={() => setConfirmDialog(null)}>
-          <div className="modal-content" style={{ maxWidth: '400px', padding: '1.5rem' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0 }}>
-              {confirmDialog.action === 'disable' ? '無効化の確認' : '有効化の確認'}
+              {confirmDialog.action === 'disable' ? '🚫 無効化の確認' : '✅ 有効化の確認'}
             </h3>
-            <p>
+            <p style={{ color: '#ccc', marginBottom: '1.5rem' }}>
               「{confirmDialog.name}」を
               {confirmDialog.action === 'disable' ? '無効化' : '有効化'}しますか？
             </p>
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setConfirmDialog(null)}>
                 キャンセル
               </button>

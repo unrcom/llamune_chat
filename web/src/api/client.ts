@@ -136,8 +136,9 @@ export async function getMe() {
 // パラメータセットテンプレート API
 // ========================================
 
-export async function getPsetsTemplates() {
-  const response = await fetch(`${API_BASE}/psets_template?enabled=1`);
+export async function getPsetsTemplates(enabledOnly = true) {
+  const query = enabledOnly ? '?enabled=1' : '';
+  const response = await fetch(`${API_BASE}/psets_template${query}`);
   if (!response.ok) throw new Error('Failed to fetch psets templates');
   return (await response.json()).templates;
 }

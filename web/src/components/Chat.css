@@ -131,6 +131,17 @@
   position: relative;
 }
 
+.session-info-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  margin-right: 0.4rem;
+  flex-shrink: 0;
+}
+
 .session-item:hover {
   background: #1a1a2e;
 }
