@@ -951,16 +951,30 @@ export function deleteSession(sessionId: number, userId?: number): boolean {
   const db = initDatabase();
 
   try {
-    let query = 'DELETE FROM sessions WHERE id = ?';
-    const params: number[] = [sessionId];
-
+    // セッションの存在確認
+    let checkQuery = 'SELECT id FROM sessions WHERE id = ?';
+    const checkParams: number[] = [sessionId];
     if (userId !== undefined) {
-      query += ' AND user_id = ?';
-      params.push(userId);
+      checkQuery += ' AND user_id = ?';
+      checkParams.push(userId);
     }
+    const session = db.prepare(checkQuery).get(...checkParams) as { id: number } | undefined;
+    if (!session) return false;
 
-    const result = db.prepare(query).run(...params);
-    return result.changes > 0;
+    // 外部キーチェックを一時無効化して削除
+    db.pragma('foreign_keys = OFF');
+    const deleteAll = db.transaction(() => {
+      db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+      db.prepare('DELETE FROM psets_current WHERE session_id = ?').run(sessionId);
+      db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+    });
+    deleteAll();
+    db.pragma('foreign_keys = ON');
+
+    return true;
+  } catch (err) {
+    db.pragma('foreign_keys = ON');
+    throw err;
   } finally {
     db.close();
   }
