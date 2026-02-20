@@ -255,7 +255,7 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
     }
 
     // リトライ用のモデル（指定がなければセッションのモデル）
-    const retryModel = model || sessionData.session.model;
+    const retryModel = model || sessionData.model;
 
     // プロジェクトパスを取得
     const projectPath = sessionData.session.project_path || null;
