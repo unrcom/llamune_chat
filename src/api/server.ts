@@ -11,6 +11,7 @@ import sessionsRouter from './routes/sessions.js';
 import chatRouter from './routes/chat.js';
 import modelsRouter from './routes/models.js';
 import filesystemRouter from './routes/filesystem.js';
+import foldersRouter from './routes/folders.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/sessions', sessionsRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/models', modelsRouter);
 app.use('/api/filesystem', filesystemRouter);
+app.use('/api/folders', foldersRouter);
 
 // ヘルスチェック
 app.get('/api/health', (req, res) => {

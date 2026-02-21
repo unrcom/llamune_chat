@@ -2,6 +2,16 @@
  * 型定義
  */
 
+export type Folder = {
+  id: number;
+  user_id: number | null;
+  name: string;
+  icon: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type User = {
   id: number;
   username: string;
@@ -63,6 +73,7 @@ export type Session = {
   psets_icon?: string;
   model?: string;
   project_path?: string;
+  folder_id?: number | null;
 };
 
 export type Message = {

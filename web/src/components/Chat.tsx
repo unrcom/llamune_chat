@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../hooks/useAuth';
-import type { PsetsTemplate, Model, Session, Message, ImportedSession, PsetsCurrent } from '../types';
+import type { PsetsTemplate, Model, Session, Message, ImportedSession, PsetsCurrent, Folder } from '../types';
 import * as api from '../api/client';
 import { SessionEditModal } from './SessionEditModal';
 import { ThinkingBlock } from './ThinkingBlock';
@@ -17,11 +17,115 @@ import { AnswerSelector } from './AnswerSelector';
 import { DirectoryTreeModal } from './DirectoryTreeModal';
 
 
+// ========================================
+// セッションアイテムコンポーネント
+// ========================================
+function SessionItem({
+  session, folders, isActive, hoverInfoSessionId, movingSessionId,
+  onSelect, onHoverInfo, onExport, onEdit, onDelete, onMoveStart, onMoveSelect, formatDate,
+}: {
+  session: Session;
+  folders: Folder[];
+  isActive: boolean;
+  hoverInfoSessionId: number | null;
+  movingSessionId: number | null;
+  onSelect: () => void;
+  onHoverInfo: (id: number) => void;
+  onExport: (id: number, e: React.MouseEvent) => void;
+  onEdit: (session: Session, e: React.MouseEvent) => void;
+  onDelete: (id: number, e: React.MouseEvent) => void;
+  onMoveStart: (id: number) => void;
+  onMoveSelect: (sessionId: number, folderId: number | null) => void;
+  formatDate: (d: string) => string;
+}) {
+  const isMoving = movingSessionId === session.id;
+
+  return (
+    <div
+      className={`group flex justify-between items-center px-3 py-2.5 rounded-md cursor-pointer mb-1 relative transition-colors hover:bg-[#1a1a2e] ${isActive ? 'bg-[#4a9eff33]' : ''}`}
+      onClick={onSelect}
+    >
+      <div className="flex items-center flex-1 min-w-0">
+        <button
+          className="bg-none border-none p-0 cursor-pointer text-base leading-none mr-2 shrink-0"
+          onClick={(e) => { e.stopPropagation(); onHoverInfo(session.id); }}
+        >
+          {session.psets_icon || '🔵'}
+        </button>
+
+        {/* セッション情報ポップオーバー */}
+        {hoverInfoSessionId === session.id && (
+          <div className="absolute left-0 top-full mt-2 bg-[#1a1a2e] border border-[#444] rounded-md p-3 w-[280px] z-[1000] shadow-lg">
+            {[
+              { label: '📅 日付:', value: session.created_at ? formatDate(session.created_at) : '(不明)' },
+              { label: '🎯 パラメータセット:', value: `${session.psets_icon || ''} ${session.psets_name || '(なし)'}` },
+              { label: '🤖 LLM:', value: session.model || '(不明)' },
+              { label: '📁 プロジェクト:', value: session.project_path || '(なし)', mono: true },
+              { label: '💬 チャット数:', value: String(session.message_count ?? 0) },
+            ].map(({ label, value, mono }) => (
+              <div key={label} className="flex gap-2 text-xs mb-1 text-[#ccc] items-start">
+                <span className="text-[#888] whitespace-nowrap shrink-0">{label}</span>
+                <span className={`break-all ${mono ? 'font-mono text-[0.7rem]' : ''}`}>{value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
+          {isActive && '⭐ '}
+          {session.title || '(無題)'}
+        </span>
+      </div>
+
+      {/* アクションボタン */}
+      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+        <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onExport(session.id, e)} title="エクスポート">📥</button>
+        <button className="p-1 text-xs text-[#888] hover:text-white" onClick={() => onMoveStart(session.id)} title="フォルダに移動">📂</button>
+        <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onEdit(session, e)} title="編集">✏️</button>
+        <button className="p-1 text-xs text-[#888] hover:text-[#ff4444]" onClick={(e) => onDelete(session.id, e)} title="削除">🗑️</button>
+      </div>
+
+      {/* フォルダ移動メニュー */}
+      {isMoving && (
+        <div
+          className="absolute right-0 top-full mt-1 bg-[#1a1a2e] border border-[#444] rounded-md p-2 w-48 z-[1000] shadow-lg"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="text-xs text-[#888] mb-2 px-1">移動先フォルダ</div>
+          <button
+            className="w-full text-left px-2 py-1.5 text-xs text-[#ccc] hover:bg-[#333] rounded"
+            onClick={() => onMoveSelect(session.id, null)}
+          >
+            🚫 フォルダなし
+          </button>
+          {folders.map(f => (
+            <button
+              key={f.id}
+              className={`w-full text-left px-2 py-1.5 text-xs text-[#ccc] hover:bg-[#333] rounded ${session.folder_id === f.id ? 'text-[#4a9eff]' : ''}`}
+              onClick={() => onMoveSelect(session.id, f.id)}
+            >
+              {f.icon || '📁'} {f.name}
+              {session.folder_id === f.id && ' ✓'}
+            </button>
+          ))}
+          <button
+            className="w-full text-left px-2 py-1.5 text-xs text-[#888] hover:bg-[#333] rounded mt-1 border-t border-[#333] pt-2"
+            onClick={() => onMoveSelect(session.id, session.folder_id ?? null)}
+          >
+            キャンセル
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const { user, logout } = useAuth();
   const [psetsTemplates, setPsetsTemplates] = useState<PsetsTemplate[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [currentSession, setCurrentSession] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
@@ -63,6 +167,14 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const [importedData, setImportedData] = useState<ImportedSession | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // フォルダ管理関連の状態
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<number>>(new Set());
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [folderFormName, setFolderFormName] = useState('');
+  const [folderFormIcon, setFolderFormIcon] = useState('📁');
+  const [movingSessionId, setMovingSessionId] = useState<number | null>(null);
+
   // 新規セッション作成直後はメッセージ再取得をスキップするフラグ
   const skipFetchMessagesRef = useRef(false);
 
@@ -83,14 +195,16 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [templatesData, modelsData, sessionsData] = await Promise.all([
+        const [templatesData, modelsData, sessionsData, foldersData] = await Promise.all([
           api.getPsetsTemplates(),
           api.getModels(),
           api.getSessions(),
+          api.getFolders(),
         ]);
         setPsetsTemplates(templatesData);
         setModels(modelsData);
         setSessions(sessionsData);
+        setFolders(foldersData);
         if (templatesData.length > 0) {
           setSelectedTemplate(templatesData[0].id);
           setSelectedModel(templatesData[0].model || '');
@@ -198,6 +312,68 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setPsetsIcon(template.icon || null);
     setShowNewChat(false);
     setSelectedProjectPath(null);
+  };
+
+  // フォルダの折りたたみ切り替え
+  const toggleFolderCollapse = (folderId: number) => {
+    setCollapsedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(folderId)) { next.delete(folderId); } else { next.add(folderId); }
+      return next;
+    });
+  };
+
+  // フォルダ作成・編集モーダルを開く
+  const openFolderModal = (folder?: Folder) => {
+    if (folder) {
+      setEditingFolder(folder);
+      setFolderFormName(folder.name);
+      setFolderFormIcon(folder.icon || '📁');
+    } else {
+      setEditingFolder(null);
+      setFolderFormName('');
+      setFolderFormIcon('📁');
+    }
+    setShowFolderModal(true);
+  };
+
+  // フォルダ保存
+  const handleFolderSave = async () => {
+    if (!folderFormName.trim()) return;
+    try {
+      if (editingFolder) {
+        await api.updateFolder(editingFolder.id, { name: folderFormName.trim(), icon: folderFormIcon || null });
+      } else {
+        await api.createFolder({ name: folderFormName.trim(), icon: folderFormIcon || null });
+      }
+      setFolders(await api.getFolders());
+      setShowFolderModal(false);
+    } catch (err) {
+      console.error('Failed to save folder:', err);
+    }
+  };
+
+  // フォルダ削除
+  const handleFolderDelete = async (folder: Folder) => {
+    if (!confirm(`「${folder.name}」を削除しますか？\n中のセッションはフォルダなしになります。`)) return;
+    try {
+      await api.deleteFolder(folder.id);
+      setFolders(await api.getFolders());
+      setSessions(await api.getSessions());
+    } catch (err) {
+      console.error('Failed to delete folder:', err);
+    }
+  };
+
+  // セッションをフォルダに移動
+  const handleMoveSession = async (sessionId: number, folderId: number | null) => {
+    try {
+      await api.updateSessionFolder(folderId, sessionId);
+      setSessions(await api.getSessions());
+      setMovingSessionId(null);
+    } catch (err) {
+      console.error('Failed to move session:', err);
+    }
   };
 
   // メッセージ送信
@@ -558,49 +734,99 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           </button>
         </div>
 
-        {/* セッション一覧 */}
+        {/* セッション一覧（フォルダ構造） */}
         <div className="flex-1 overflow-y-auto p-2">
-          {sessions.map(session => (
-            <div
-              key={session.id}
-              className={`group flex justify-between items-center px-3 py-3 rounded-md cursor-pointer mb-1 relative transition-colors hover:bg-[#1a1a2e] ${currentSession === session.id ? 'bg-[#4a9eff33]' : ''}`}
-              onClick={() => setCurrentSession(session.id)}
-            >
-              <div className="flex items-center flex-1 min-w-0">
-                <button
-                  className="bg-none border-none p-0 cursor-pointer text-base leading-none mr-2 shrink-0"
-                  onClick={(e) => { e.stopPropagation(); setHoverInfoSessionId(hoverInfoSessionId === session.id ? null : session.id); }}
+
+          {/* フォルダ追加ボタン */}
+          <button
+            className="w-full py-2 mb-2 bg-transparent text-[#888] border border-dashed border-[#444] rounded-md cursor-pointer text-xs hover:bg-[#333] hover:text-[#4a9eff] hover:border-[#4a9eff] transition-colors"
+            onClick={() => openFolderModal()}
+          >
+            + フォルダを追加
+          </button>
+
+          {/* フォルダ一覧 */}
+          {folders.map(folder => {
+            const folderSessions = sessions.filter(s => s.folder_id === folder.id);
+            const isCollapsed = collapsedFolders.has(folder.id);
+            return (
+              <div key={folder.id} className="mb-2">
+                {/* フォルダヘッダー */}
+                <div className="group flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-[#1a1a2e] cursor-pointer"
+                  onClick={() => toggleFolderCollapse(folder.id)}
                 >
-                  {session.psets_icon || '🔵'}
-                </button>
-                {hoverInfoSessionId === session.id && (
-                  <div className="absolute left-0 top-full mt-2 bg-[#1a1a2e] border border-[#444] rounded-md p-3 w-[280px] z-[1000] shadow-lg">
-                    {[
-                      { label: '📅 日付:', value: session.created_at ? formatDate(session.created_at) : '(不明)' },
-                      { label: '🎯 パラメータセット:', value: `${session.psets_icon || ''} ${session.psets_name || '(なし)'}` },
-                      { label: '🤖 LLM:', value: session.model || '(不明)' },
-                      { label: '📁 プロジェクト:', value: session.project_path || '(なし)', mono: true },
-                      { label: '💬 チャット数:', value: String(session.message_count ?? 0) },
-                    ].map(({ label, value, mono }) => (
-                      <div key={label} className="flex gap-2 text-xs mb-1 text-[#ccc] items-start">
-                        <span className="text-[#888] whitespace-nowrap shrink-0">{label}</span>
-                        <span className={`break-all ${mono ? 'font-mono text-[0.7rem]' : ''}`}>{value}</span>
-                      </div>
+                  <span className="text-[#888] text-xs">{isCollapsed ? '▶' : '▼'}</span>
+                  <span className="text-sm mr-1">{folder.icon || '📁'}</span>
+                  <span className="flex-1 text-sm text-[#ccc] font-medium truncate">{folder.name}</span>
+                  <span className="text-xs text-[#666]">{folderSessions.length}</span>
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button className="p-1 text-xs text-[#888] hover:text-white" onClick={() => openFolderModal(folder)} title="編集">✏️</button>
+                    <button className="p-1 text-xs text-[#888] hover:text-[#ff4444]" onClick={() => handleFolderDelete(folder)} title="削除">🗑️</button>
+                  </div>
+                </div>
+
+                {/* フォルダ内セッション */}
+                {!isCollapsed && (
+                  <div className="ml-3 border-l border-[#333] pl-2">
+                    {folderSessions.length === 0 && (
+                      <div className="text-xs text-[#555] py-1 px-2">セッションなし</div>
+                    )}
+                    {folderSessions.map(session => (
+                      <SessionItem
+                        key={session.id}
+                        session={session}
+                        folders={folders}
+                        isActive={currentSession === session.id}
+                        hoverInfoSessionId={hoverInfoSessionId}
+                        movingSessionId={movingSessionId}
+                        onSelect={() => setCurrentSession(session.id)}
+                        onHoverInfo={(id) => setHoverInfoSessionId(hoverInfoSessionId === id ? null : id)}
+                        onExport={handleExportSession}
+                        onEdit={openSessionEditModal}
+                        onDelete={handleDeleteSession}
+                        onMoveStart={(id) => setMovingSessionId(id)}
+                        onMoveSelect={handleMoveSession}
+                        formatDate={formatDate}
+                      />
                     ))}
                   </div>
                 )}
-                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
-                  {currentSession === session.id && '⭐ '}
-                  {session.title || '(無題)'}
-                </span>
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity session-actions-hover">
-                <button className="bg-none border-none cursor-pointer p-1 text-sm opacity-70 hover:opacity-100 transition-opacity" onClick={(e) => handleExportSession(session.id, e)} title="エクスポート">📥</button>
-                <button className="bg-none border-none cursor-pointer p-1 text-sm opacity-70 hover:opacity-100 transition-opacity" onClick={(e) => openSessionEditModal(session, e)} title="編集">✏️</button>
-                <button className="bg-none border-none cursor-pointer p-1 text-sm opacity-70 hover:opacity-100 hover:text-[#ff4444] transition-colors" onClick={(e) => handleDeleteSession(session.id, e)} title="削除">🗑️</button>
+            );
+          })}
+
+          {/* フォルダなしセッション */}
+          {(() => {
+            const noFolderSessions = sessions.filter(s => !s.folder_id);
+            if (noFolderSessions.length === 0) return null;
+            return (
+              <div className="mt-2">
+                {folders.length > 0 && (
+                  <div className="text-xs text-[#555] px-2 py-1 mb-1">── フォルダなし ──</div>
+                )}
+                {noFolderSessions.map(session => (
+                  <SessionItem
+                    key={session.id}
+                    session={session}
+                    folders={folders}
+                    isActive={currentSession === session.id}
+                    hoverInfoSessionId={hoverInfoSessionId}
+                    movingSessionId={movingSessionId}
+                    onSelect={() => setCurrentSession(session.id)}
+                    onHoverInfo={(id) => setHoverInfoSessionId(hoverInfoSessionId === id ? null : id)}
+                    onExport={handleExportSession}
+                    onEdit={openSessionEditModal}
+                    onDelete={handleDeleteSession}
+                    onMoveStart={(id) => setMovingSessionId(id)}
+                    onMoveSelect={handleMoveSession}
+                    formatDate={formatDate}
+                  />
+                ))}
               </div>
-            </div>
-          ))}
+            );
+          })()}
         </div>
 
         <div className="p-4 border-t border-[#333]">
@@ -852,6 +1078,49 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           onSave={handleSessionEditSave}
         />
       )}
+
+      {/* フォルダ作成・編集モーダル */}
+      {showFolderModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]" onClick={() => setShowFolderModal(false)}>
+          <div className="bg-[#16213e] p-6 rounded-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="text-white font-semibold mb-4">{editingFolder ? 'フォルダを編集' : '新しいフォルダ'}</h3>
+            <div className="mb-4">
+              <label className="block text-[#ccc] text-sm mb-2">アイコン</label>
+              <input
+                className="w-full px-3 py-2 bg-[#0f0f23] border border-[#333] rounded-md text-white text-sm focus:outline-none focus:border-[#4a9eff]"
+                value={folderFormIcon}
+                onChange={e => setFolderFormIcon(e.target.value)}
+                placeholder="📁"
+                maxLength={4}
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-[#ccc] text-sm mb-2">フォルダ名</label>
+              <input
+                className="w-full px-3 py-2 bg-[#0f0f23] border border-[#333] rounded-md text-white text-sm focus:outline-none focus:border-[#4a9eff]"
+                value={folderFormName}
+                onChange={e => setFolderFormName(e.target.value)}
+                placeholder="フォルダ名を入力..."
+                autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') handleFolderSave(); }}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button className="px-4 py-2 bg-[#333] text-white rounded-md text-sm hover:bg-[#444] transition-colors" onClick={() => setShowFolderModal(false)}>キャンセル</button>
+              <button
+                className="px-4 py-2 bg-[#4a9eff] text-white rounded-md text-sm hover:bg-[#3a8eef] disabled:bg-[#555] disabled:cursor-not-allowed transition-colors"
+                onClick={handleFolderSave}
+                disabled={!folderFormName.trim()}
+              >
+                {editingFolder ? '保存' : '作成'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* hidden file input */}
+      <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleFileImport} />
     </div>
   );
 }

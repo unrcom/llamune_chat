@@ -108,6 +108,19 @@ export interface PsetsCurrent {
 }
 
 /**
+ * フォルダの型定義
+ */
+export interface Folder {
+  id: number;
+  user_id: number | null;
+  name: string;
+  icon: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * セッションの型定義
  */
 export interface Session {
@@ -115,6 +128,7 @@ export interface Session {
   user_id: number | null;
   title: string | null;
   project_path: string | null;
+  folder_id: number | null;
   psets_current_id: number | null;
   created_at: string;
   updated_at: string;
@@ -134,6 +148,7 @@ export interface SessionListItem {
   psets_icon?: string;
   model?: string;
   project_path?: string;
+  folder_id?: number | null;
 }
 
 /**
@@ -310,6 +325,20 @@ export function initDatabase(): Database.Database {
     )
   `);
 
+  // フォルダテーブル
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS folders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      name TEXT NOT NULL,
+      icon TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 100,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
   // セッションテーブル
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -317,13 +346,21 @@ export function initDatabase(): Database.Database {
       user_id INTEGER,
       title TEXT,
       project_path TEXT,
+      folder_id INTEGER,
       psets_current_id INTEGER,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL,
       FOREIGN KEY (psets_current_id) REFERENCES psets_current(id)
     )
   `);
+
+  // マイグレーション: 既存のsessionsテーブルにfolder_idカラムを追加
+  const sessionsColumns = db.pragma('table_info(sessions)') as Array<{ name: string }>;
+  if (!sessionsColumns.some(col => col.name === 'folder_id')) {
+    db.exec('ALTER TABLE sessions ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL');
+  }
 
   // メッセージテーブル
   db.exec(`
@@ -782,6 +819,7 @@ export function listSessions(limit = 200, userId?: number): SessionListItem[] {
         s.id,
         s.title,
         s.project_path,
+        s.folder_id,
         s.created_at,
         s.updated_at,
         pc.psets_name,
@@ -1352,3 +1390,120 @@ export function cleanupExpiredRefreshTokens(): number {
     db.close();
   }
 }
+
+// ========================================
+// フォルダ管理
+// ========================================
+
+/**
+ * フォルダ一覧を取得
+ */
+export function listFolders(userId?: number): Folder[] {
+  const db = initDatabase();
+  try {
+    if (userId !== undefined) {
+      return db
+        .prepare('SELECT * FROM folders WHERE user_id = ? OR user_id IS NULL ORDER BY sort_order ASC, id ASC')
+        .all(userId) as Folder[];
+    }
+    return db
+      .prepare('SELECT * FROM folders ORDER BY sort_order ASC, id ASC')
+      .all() as Folder[];
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * フォルダを作成
+ */
+export function createFolder(params: {
+  name: string;
+  icon?: string | null;
+  sort_order?: number;
+  userId?: number;
+}): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+  try {
+    const result = db
+      .prepare('INSERT INTO folders (user_id, name, icon, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(params.userId ?? null, params.name, params.icon ?? null, params.sort_order ?? 100, now, now);
+    return result.lastInsertRowid as number;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * フォルダを更新
+ */
+export function updateFolder(id: number, params: {
+  name?: string;
+  icon?: string | null;
+  sort_order?: number;
+}, userId?: number): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+  try {
+    const folder = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Folder | undefined;
+    if (!folder) return false;
+    if (userId !== undefined && folder.user_id !== null && folder.user_id !== userId) return false;
+
+    const result = db
+      .prepare('UPDATE folders SET name = ?, icon = ?, sort_order = ?, updated_at = ? WHERE id = ?')
+      .run(
+        params.name ?? folder.name,
+        params.icon !== undefined ? params.icon : folder.icon,
+        params.sort_order ?? folder.sort_order,
+        now,
+        id
+      );
+    return result.changes > 0;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * フォルダを削除（中のセッションはfolder_id=NULLに）
+ */
+export function deleteFolder(id: number, userId?: number): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+  try {
+    const folder = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Folder | undefined;
+    if (!folder) return false;
+    if (userId !== undefined && folder.user_id !== null && folder.user_id !== userId) return false;
+
+    const deleteOp = db.transaction(() => {
+      db.prepare('UPDATE sessions SET folder_id = NULL, updated_at = ? WHERE folder_id = ?').run(now, id);
+      db.prepare('DELETE FROM folders WHERE id = ?').run(id);
+    });
+    deleteOp();
+    return true;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * セッションのfolder_idを更新
+ */
+export function updateSessionFolder(sessionId: number, folderId: number | null, userId?: number): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+  try {
+    let query = 'UPDATE sessions SET folder_id = ?, updated_at = ? WHERE id = ?';
+    const params: (number | string | null)[] = [folderId, now, sessionId];
+    if (userId !== undefined) {
+      query += ' AND user_id = ?';
+      params.push(userId);
+    }
+    const result = db.prepare(query).run(...params);
+    return result.changes > 0;
+  } finally {
+    db.close();
+  }
+}
+

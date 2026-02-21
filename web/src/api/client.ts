@@ -512,3 +512,47 @@ export async function getDirectoryTree(path?: string): Promise<DirectoryNode> {
   if (!response.ok) throw new Error('Failed to fetch directory tree');
   return await response.json();
 }
+
+// ========================================
+// フォルダ API
+// ========================================
+
+export async function getFolders() {
+  const response = await authFetch(`${API_BASE}/folders`);
+  if (!response.ok) throw new Error('Failed to fetch folders');
+  return (await response.json()).folders;
+}
+
+export async function createFolder(data: { name: string; icon?: string | null; sort_order?: number }) {
+  const response = await authFetch(`${API_BASE}/folders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to create folder');
+  return (await response.json()).folder;
+}
+
+export async function updateFolder(id: number, data: { name?: string; icon?: string | null; sort_order?: number }) {
+  const response = await authFetch(`${API_BASE}/folders/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to update folder');
+}
+
+export async function deleteFolder(id: number) {
+  const response = await authFetch(`${API_BASE}/folders/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete folder');
+}
+
+export async function updateSessionFolder(folderId: number | null, sessionId: number) {
+  const targetFolderId = folderId ?? 0;
+  const response = await authFetch(`${API_BASE}/folders/${targetFolderId}/sessions/${sessionId}`, {
+    method: 'PUT',
+  });
+  if (!response.ok) throw new Error('Failed to update session folder');
+}
