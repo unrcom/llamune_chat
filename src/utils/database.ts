@@ -902,6 +902,7 @@ export function getSession(sessionId: number, userId?: number): {
   psetsName?: string;
   psetsIcon?: string;
   model?: string;
+  pendingRetry?: { candidates: Array<{ content: string; thinking?: string; model?: string }> };
 } | null {
   const db = initDatabase();
 
@@ -959,7 +960,24 @@ export function getSession(sessionId: number, userId?: number): {
       is_adopted: msg.is_adopted !== 0,
     }));
 
-    return { session, messages, systemPrompt, psetsName, psetsIcon, model };
+    // 未決定のリトライ候補を検出
+    // 最後のユーザーメッセージ以降にアシスタントメッセージが複数ある場合はリトライ中
+    let pendingRetry: { candidates: Array<{ content: string; thinking?: string; model?: string }> } | undefined;
+    const lastUserIndex = [...messagesRaw].map((m, i) => m.role === 'user' ? i : -1).filter(i => i !== -1).pop();
+    if (lastUserIndex !== undefined) {
+      const afterLastUser = messagesRaw.slice(lastUserIndex + 1).filter(m => m.role === 'assistant');
+      if (afterLastUser.length > 1) {
+        pendingRetry = {
+          candidates: afterLastUser.map(m => ({
+            content: decrypt(m.content),
+            thinking: m.thinking ? decrypt(m.thinking) : undefined,
+            model: m.model,
+          })),
+        };
+      }
+    }
+
+    return { session, messages, systemPrompt, psetsName, psetsIcon, model, pendingRetry };
   } finally {
     db.close();
   }

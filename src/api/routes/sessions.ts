@@ -88,6 +88,7 @@ router.get('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
       psetsName: sessionData.psetsName,
       psetsIcon: sessionData.psetsIcon,
       model: sessionData.model,
+      pendingRetry: sessionData.pendingRetry,
     });
   } catch (error) {
     console.error('Get session error:', error);

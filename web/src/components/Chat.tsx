@@ -268,6 +268,24 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           setSessionModel(data.model || null);
           setPsetsName(data.psetsName || null);
           setPsetsIcon(data.psetsIcon || null);
+
+          // 未決定のリトライ候補を復元
+          if (data.pendingRetry && data.pendingRetry.candidates.length > 1) {
+            const candidates = data.pendingRetry.candidates.map((c: { content: string; thinking?: string; model?: string }) => ({
+              role: 'assistant' as const,
+              content: c.content,
+              thinking: c.thinking,
+              model: c.model,
+            }));
+            setAnswerCandidates(candidates);
+            setRetryPending(true);
+            // messagesからリトライ候補（最後のユーザーメッセージ以降のassistant）を除外
+            setMessages(prev => {
+              const lastUserIdx = [...prev].map((m, i) => m.role === 'user' ? i : -1).filter(i => i !== -1).pop();
+              if (lastUserIdx === undefined) return prev;
+              return prev.slice(0, lastUserIdx + 1);
+            });
+          }
         } catch (err) {
           console.error('Failed to fetch messages:', err);
           skipAutoScrollRef.current = false;
@@ -723,13 +741,16 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           }
         }
 
+        const adoptedMessage = { ...adoptedAnswer, is_adopted: true };
+        const keptMessages = keptAnswers.map(answer => ({ ...answer, is_adopted: false }));
+
         if (lastAssistantIdx !== -1) {
-          newMessages[lastAssistantIdx] = { ...adoptedAnswer, is_adopted: true };
-          const keptMessages = keptAnswers.map(answer => ({
-            ...answer,
-            is_adopted: false,
-          }));
+          // 既存のassistantメッセージを採用で置き換え、履歴保存を後ろに挿入
+          newMessages[lastAssistantIdx] = adoptedMessage;
           newMessages.splice(lastAssistantIdx + 1, 0, ...keptMessages);
+        } else {
+          // retryPending復元後など、assistantメッセージが除外済みの場合は末尾に追加
+          newMessages.push(adoptedMessage, ...keptMessages);
         }
 
         return newMessages;
