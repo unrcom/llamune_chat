@@ -556,3 +556,16 @@ export async function updateSessionFolder(folderId: number | null, sessionId: nu
   });
   if (!response.ok) throw new Error('Failed to update session folder');
 }
+
+export async function getTrashFolder() {
+  const response = await authFetch(`${API_BASE}/folders/trash`);
+  if (!response.ok) throw new Error('Failed to get trash folder');
+  return (await response.json()).folder;
+}
+
+export async function hardDeleteSession(sessionId: number) {
+  const response = await authFetch(`${API_BASE}/folders/trash/sessions/${sessionId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to hard delete session');
+}

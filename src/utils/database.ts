@@ -116,6 +116,7 @@ export interface Folder {
   name: string;
   icon: string | null;
   sort_order: number;
+  is_trash: number; // 1=ゴミ箱, 0=通常
   created_at: string;
   updated_at: string;
 }
@@ -333,11 +334,18 @@ export function initDatabase(): Database.Database {
       name TEXT NOT NULL,
       icon TEXT,
       sort_order INTEGER NOT NULL DEFAULT 100,
+      is_trash INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     )
   `);
+
+  // マイグレーション: 既存のfoldersテーブルにis_trashカラムを追加
+  const foldersColumns = db.pragma('table_info(folders)') as Array<{ name: string }>;
+  if (!foldersColumns.some(col => col.name === 'is_trash')) {
+    db.exec('ALTER TABLE folders ADD COLUMN is_trash INTEGER NOT NULL DEFAULT 0');
+  }
 
   // セッションテーブル
   db.exec(`
@@ -381,6 +389,9 @@ export function initDatabase(): Database.Database {
   // デフォルトテンプレートの初期化
   initializeDefaultTemplates(db);
 
+  // ゴミ箱フォルダの初期化（全ユーザー共通の1件）
+  initializeTrashFolder(db);
+
   return db;
 }
 
@@ -412,6 +423,19 @@ function initializeDefaultTemplates(db: Database.Database): void {
       INSERT INTO psets_template (version, visibility, sort_order, psets_name, icon, description, model, system_prompt, max_tokens, context_messages, temperature, top_p, enabled, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(1, 'public', 20, '一般的な対話', '🤖', '一般的な対話と推論', null, null, null, null, null, null, 1, now, now);
+  }
+}
+
+/**
+ * ゴミ箱フォルダを初期化（存在しない場合のみ作成）
+ */
+function initializeTrashFolder(db: Database.Database): void {
+  const now = new Date().toISOString();
+  const trashExists = db.prepare('SELECT id FROM folders WHERE is_trash = 1').get();
+  if (!trashExists) {
+    db.prepare(
+      'INSERT INTO folders (user_id, name, icon, sort_order, is_trash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(null, 'ゴミ箱', '🗑️', 9999, 1, now, now);
   }
 }
 
@@ -1396,19 +1420,63 @@ export function cleanupExpiredRefreshTokens(): number {
 // ========================================
 
 /**
- * フォルダ一覧を取得
+ * フォルダ一覧を取得（ゴミ箱を除く）
  */
 export function listFolders(userId?: number): Folder[] {
   const db = initDatabase();
   try {
     if (userId !== undefined) {
       return db
-        .prepare('SELECT * FROM folders WHERE user_id = ? OR user_id IS NULL ORDER BY sort_order ASC, id ASC')
+        .prepare('SELECT * FROM folders WHERE is_trash = 0 AND (user_id = ? OR user_id IS NULL) ORDER BY sort_order ASC, id ASC')
         .all(userId) as Folder[];
     }
     return db
-      .prepare('SELECT * FROM folders ORDER BY sort_order ASC, id ASC')
+      .prepare('SELECT * FROM folders WHERE is_trash = 0 ORDER BY sort_order ASC, id ASC')
       .all() as Folder[];
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * ゴミ箱フォルダを取得
+ */
+export function getTrashFolder(): Folder | null {
+  const db = initDatabase();
+  try {
+    return db.prepare('SELECT * FROM folders WHERE is_trash = 1 LIMIT 1').get() as Folder | null;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * セッションを物理削除（ゴミ箱からの完全削除用）
+ */
+export function hardDeleteSession(sessionId: number, userId?: number): boolean {
+  const db = initDatabase();
+  try {
+    let checkQuery = 'SELECT id FROM sessions WHERE id = ?';
+    const checkParams: number[] = [sessionId];
+    if (userId !== undefined) {
+      checkQuery += ' AND user_id = ?';
+      checkParams.push(userId);
+    }
+    const session = db.prepare(checkQuery).get(...checkParams) as { id: number } | undefined;
+    if (!session) return false;
+
+    db.pragma('foreign_keys = OFF');
+    const deleteAll = db.transaction(() => {
+      db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+      db.prepare('DELETE FROM psets_current WHERE session_id = ?').run(sessionId);
+      db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+    });
+    deleteAll();
+    db.pragma('foreign_keys = ON');
+    return true;
+  } catch (err) {
+    db.pragma('foreign_keys = ON');
+    throw err;
   } finally {
     db.close();
   }
@@ -1474,6 +1542,7 @@ export function deleteFolder(id: number, userId?: number): boolean {
   try {
     const folder = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Folder | undefined;
     if (!folder) return false;
+    if (folder.is_trash) return false; // ゴミ箱は削除不可
     if (userId !== undefined && folder.user_id !== null && folder.user_id !== userId) return false;
 
     const deleteOp = db.transaction(() => {

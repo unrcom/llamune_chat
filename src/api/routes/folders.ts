@@ -10,6 +10,8 @@ import {
   updateFolder,
   deleteFolder,
   updateSessionFolder,
+  getTrashFolder,
+  hardDeleteSession,
 } from '../../utils/database.js';
 
 const router = Router();
@@ -121,3 +123,31 @@ router.put('/:id/sessions/:sessionId', authMiddleware, (req, res) => {
 });
 
 export default router;
+
+// ゴミ箱フォルダ取得
+router.get('/trash', authMiddleware, (req, res) => {
+  try {
+    const trash = getTrashFolder();
+    res.json({ folder: trash });
+  } catch (err) {
+    console.error('Failed to get trash folder:', err);
+    res.status(500).json({ error: 'Failed to get trash folder' });
+  }
+});
+
+// ゴミ箱内セッションを物理削除
+router.delete('/trash/sessions/:sessionId', authMiddleware, (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    const sessionId = Number(req.params.sessionId);
+    if (isNaN(sessionId)) return res.status(400).json({ error: 'Invalid session id' });
+
+    const deleted = hardDeleteSession(sessionId, userId);
+    if (!deleted) return res.status(404).json({ error: 'Session not found' });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to hard delete session:', err);
+    res.status(500).json({ error: 'Failed to delete session' });
+  }
+});

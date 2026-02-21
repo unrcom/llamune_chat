@@ -21,7 +21,7 @@ import { DirectoryTreeModal } from './DirectoryTreeModal';
 // セッションアイテムコンポーネント
 // ========================================
 function SessionItem({
-  session, folders, isActive, hoverInfoSessionId, movingSessionId,
+  session, folders, isActive, hoverInfoSessionId, movingSessionId, isTrash = false,
   onSelect, onHoverInfo, onExport, onEdit, onDelete, onMoveStart, onMoveSelect, formatDate,
 }: {
   session: Session;
@@ -29,6 +29,7 @@ function SessionItem({
   isActive: boolean;
   hoverInfoSessionId: number | null;
   movingSessionId: number | null;
+  isTrash?: boolean;
   onSelect: () => void;
   onHoverInfo: (id: number) => void;
   onExport: (id: number, e: React.MouseEvent) => void;
@@ -79,10 +80,21 @@ function SessionItem({
 
       {/* アクションボタン */}
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-        <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onExport(session.id, e)} title="エクスポート">📥</button>
-        <button className="p-1 text-xs text-[#888] hover:text-white" onClick={() => onMoveStart(session.id)} title="フォルダに移動">📂</button>
-        <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onEdit(session, e)} title="編集">✏️</button>
-        <button className="p-1 text-xs text-[#888] hover:text-[#ff4444]" onClick={(e) => onDelete(session.id, e)} title="削除">🗑️</button>
+        {!isTrash && <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onExport(session.id, e)} title="エクスポート">📥</button>}
+        {!isTrash && <button className="p-1 text-xs text-[#888] hover:text-white" onClick={() => onMoveStart(session.id)} title="フォルダに移動">📂</button>}
+        {!isTrash && <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onEdit(session, e)} title="編集">✏️</button>}
+        {isTrash && (
+          <button
+            className="p-1 text-xs text-[#888] hover:text-[#4a9eff]"
+            onClick={(e) => { e.stopPropagation(); onMoveSelect(session.id, null); }}
+            title="元に戻す"
+          >↩️</button>
+        )}
+        <button
+          className={`p-1 text-xs text-[#888] hover:text-[#ff4444] ${isTrash ? 'opacity-100' : ''}`}
+          onClick={(e) => onDelete(session.id, e)}
+          title={isTrash ? '完全に削除' : 'ゴミ箱へ'}
+        >🗑️</button>
       </div>
 
       {/* フォルダ移動メニュー */}
@@ -107,8 +119,7 @@ function SessionItem({
               {f.icon || '📁'} {f.name}
               {session.folder_id === f.id && ' ✓'}
             </button>
-          ))}
-          <button
+          ))}          <button
             className="w-full text-left px-2 py-1.5 text-xs text-[#888] hover:bg-[#333] rounded mt-1 border-t border-[#333] pt-2"
             onClick={() => onMoveSelect(session.id, session.folder_id ?? null)}
           >
@@ -126,6 +137,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const [models, setModels] = useState<Model[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [trashFolder, setTrashFolder] = useState<Folder | null>(null);
   const [currentSession, setCurrentSession] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
@@ -195,16 +207,18 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [templatesData, modelsData, sessionsData, foldersData] = await Promise.all([
+        const [templatesData, modelsData, sessionsData, foldersData, trashData] = await Promise.all([
           api.getPsetsTemplates(),
           api.getModels(),
           api.getSessions(),
           api.getFolders(),
+          api.getTrashFolder(),
         ]);
         setPsetsTemplates(templatesData);
         setModels(modelsData);
         setSessions(sessionsData);
         setFolders(foldersData);
+        setTrashFolder(trashData);
         if (templatesData.length > 0) {
           setSelectedTemplate(templatesData[0].id);
           setSelectedModel(templatesData[0].model || '');
@@ -461,20 +475,35 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     }
   };
 
-  // セッション削除
+  // セッション削除（ゴミ箱へ移動）
   const handleDeleteSession = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('このセッションを削除しますか？')) return;
-
+    if (!trashFolder) return;
     try {
-      await api.deleteSession(id);
-      setSessions(prev => prev.filter(s => s.id !== id));
+      await api.updateSessionFolder(trashFolder.id, id);
+      setSessions(await api.getSessions());
       if (currentSession === id) {
         setCurrentSession(null);
         setMessages([]);
       }
     } catch (err) {
-      console.error('Failed to delete session:', err);
+      console.error('Failed to move session to trash:', err);
+    }
+  };
+
+  // ゴミ箱からの物理削除
+  const handleHardDeleteSession = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('このセッションを完全に削除しますか？\nこの操作は取り消せません。')) return;
+    try {
+      await api.hardDeleteSession(id);
+      setSessions(await api.getSessions());
+      if (currentSession === id) {
+        setCurrentSession(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('Failed to hard delete session:', err);
     }
   };
 
@@ -824,6 +853,51 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                     formatDate={formatDate}
                   />
                 ))}
+              </div>
+            );
+          })()}
+
+          {/* ゴミ箱フォルダ */}
+          {trashFolder && (() => {
+            const trashSessions = sessions.filter(s => s.folder_id === trashFolder.id);
+            const isCollapsed = collapsedFolders.has(trashFolder.id);
+            return (
+              <div className="mt-3 border-t border-[#333] pt-2">
+                <div
+                  className="group flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-[#1a1a2e] cursor-pointer"
+                  onClick={() => toggleFolderCollapse(trashFolder.id)}
+                >
+                  <span className="text-[#888] text-xs">{isCollapsed ? '▶' : '▼'}</span>
+                  <span className="text-sm mr-1">🗑️</span>
+                  <span className="flex-1 text-sm text-[#666] truncate">ゴミ箱</span>
+                  <span className="text-xs text-[#555]">{trashSessions.length}</span>
+                </div>
+                {!isCollapsed && (
+                  <div className="ml-3 border-l border-[#333] pl-2">
+                    {trashSessions.length === 0 && (
+                      <div className="text-xs text-[#555] py-1 px-2">空のゴミ箱</div>
+                    )}
+                    {trashSessions.map(session => (
+                      <SessionItem
+                        key={session.id}
+                        session={session}
+                        folders={folders}
+                        isActive={currentSession === session.id}
+                        hoverInfoSessionId={hoverInfoSessionId}
+                        movingSessionId={movingSessionId}
+                        isTrash={true}
+                        onSelect={() => setCurrentSession(session.id)}
+                        onHoverInfo={(id) => setHoverInfoSessionId(hoverInfoSessionId === id ? null : id)}
+                        onExport={handleExportSession}
+                        onEdit={openSessionEditModal}
+                        onDelete={handleHardDeleteSession}
+                        onMoveStart={(id) => setMovingSessionId(id)}
+                        onMoveSelect={handleMoveSession}
+                        formatDate={formatDate}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })()}

@@ -8,6 +8,7 @@ export type Folder = {
   name: string;
   icon: string | null;
   sort_order: number;
+  is_trash: number;
   created_at: string;
   updated_at: string;
 };
