@@ -45,6 +45,12 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
       response = await fetch(url, { ...options, headers });
     }
   }
+
+  // リフレッシュしても401の場合はログイン画面へ
+  if (response.status === 401) {
+    clearTokens();
+    window.location.href = '/';
+  }
   
   return response;
 }
