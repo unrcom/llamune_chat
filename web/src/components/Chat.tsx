@@ -1214,7 +1214,6 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                 onChange={e => setFolderFormName(e.target.value)}
                 placeholder="フォルダ名を入力..."
                 autoFocus
-                onKeyDown={e => { if (e.key === 'Enter') handleFolderSave(); }}
               />
             </div>
             <div className="flex gap-2 justify-end">
