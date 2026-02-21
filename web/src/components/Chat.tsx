@@ -396,7 +396,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     try {
       await api.updateSessionFolder(folderId, sessionId);
       setSessions(await api.getSessions());
-      setMovingSessionId(null);
+      setMenuOpenSessionId(null);
     } catch (err) {
       console.error('Failed to move session:', err);
     }
@@ -1172,13 +1172,36 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             <h3 className="text-white font-semibold mb-4">{editingFolder ? 'フォルダを編集' : '新しいフォルダ'}</h3>
             <div className="mb-4">
               <label className="block text-[#ccc] text-sm mb-2">アイコン</label>
-              <input
+              <select
                 className="w-full px-3 py-2 bg-[#0f0f23] border border-[#333] rounded-md text-white text-sm focus:outline-none focus:border-[#4a9eff]"
                 value={folderFormIcon}
                 onChange={e => setFolderFormIcon(e.target.value)}
-                placeholder="📁"
-                maxLength={4}
-              />
+              >
+                {[
+                  { value: '📁', label: '📁 フォルダ' },
+                  { value: '📂', label: '📂 フォルダ（開）' },
+                  { value: '💻', label: '💻 コーディング' },
+                  { value: '🤖', label: '🤖 AI・ロボット' },
+                  { value: '✍️', label: '✍️ ライティング' },
+                  { value: '🎨', label: '🎨 クリエイティブ' },
+                  { value: '📊', label: '📊 分析・データ' },
+                  { value: '🔬', label: '🔬 研究・学術' },
+                  { value: '💼', label: '💼 ビジネス' },
+                  { value: '🎓', label: '🎓 教育・学習' },
+                  { value: '🌍', label: '🌍 翻訳・言語' },
+                  { value: '🎮', label: '🎮 ゲーム' },
+                  { value: '📚', label: '📚 読書・文学' },
+                  { value: '🎵', label: '🎵 音楽' },
+                  { value: '🛠️', label: '🛠️ エンジニアリング' },
+                  { value: '💡', label: '💡 アイデア・創造' },
+                  { value: '📱', label: '📱 テクノロジー' },
+                  { value: '🎯', label: '🎯 目標・計画' },
+                  { value: '⭐', label: '⭐ お気に入り' },
+                  { value: '🌟', label: '🌟 その他' },
+                ].map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
             <div className="mb-6">
               <label className="block text-[#ccc] text-sm mb-2">フォルダ名</label>
