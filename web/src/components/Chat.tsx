@@ -21,110 +21,122 @@ import { DirectoryTreeModal } from './DirectoryTreeModal';
 // セッションアイテムコンポーネント
 // ========================================
 function SessionItem({
-  session, folders, isActive, hoverInfoSessionId, movingSessionId, isTrash = false,
-  onSelect, onHoverInfo, onExport, onEdit, onDelete, onMoveStart, onMoveSelect, formatDate,
+  session, folders, isActive, hoverInfoSessionId, menuOpenSessionId, isTrash = false,
+  onSelect, onHoverInfo, onMenuOpen, onExport, onEdit, onDelete, onMoveSelect, formatDate,
 }: {
   session: Session;
   folders: Folder[];
   isActive: boolean;
   hoverInfoSessionId: number | null;
-  movingSessionId: number | null;
+  menuOpenSessionId: number | null;
   isTrash?: boolean;
   onSelect: () => void;
   onHoverInfo: (id: number) => void;
+  onMenuOpen: (id: number | null) => void;
   onExport: (id: number, e: React.MouseEvent) => void;
   onEdit: (session: Session, e: React.MouseEvent) => void;
   onDelete: (id: number, e: React.MouseEvent) => void;
-  onMoveStart: (id: number) => void;
   onMoveSelect: (sessionId: number, folderId: number | null) => void;
   formatDate: (d: string) => string;
 }) {
-  const isMoving = movingSessionId === session.id;
+  const isMenuOpen = menuOpenSessionId === session.id;
 
   return (
     <div
-      className={`group flex justify-between items-center px-3 py-2.5 rounded-md cursor-pointer mb-1 relative transition-colors hover:bg-[#1a1a2e] ${isActive ? 'bg-[#4a9eff33]' : ''}`}
+      className={`group flex items-start px-3 py-2.5 rounded-md cursor-pointer mb-1 relative transition-colors hover:bg-[#1a1a2e] ${isActive ? 'bg-[#4a9eff33]' : ''}`}
       onClick={onSelect}
     >
-      <div className="flex items-center flex-1 min-w-0">
+      {/* アイコン（情報ポップオーバートリガー） */}
+      <button
+        className="bg-none border-none p-0 cursor-pointer text-base leading-none mr-2 shrink-0 mt-0.5"
+        onClick={(e) => { e.stopPropagation(); onHoverInfo(session.id); }}
+      >
+        {session.psets_icon || '🔵'}
+      </button>
+
+      {/* セッション情報ポップオーバー */}
+      {hoverInfoSessionId === session.id && (
+        <div className="absolute left-0 top-full mt-2 bg-[#1a1a2e] border border-[#444] rounded-md p-3 w-[280px] z-[1000] shadow-lg">
+          {[
+            { label: '📅 日付:', value: session.created_at ? formatDate(session.created_at) : '(不明)' },
+            { label: '🎯 パラメータセット:', value: `${session.psets_icon || ''} ${session.psets_name || '(なし)'}` },
+            { label: '🤖 LLM:', value: session.model || '(不明)' },
+            { label: '📁 プロジェクト:', value: session.project_path || '(なし)', mono: true },
+            { label: '💬 チャット数:', value: String(session.message_count ?? 0) },
+          ].map(({ label, value, mono }) => (
+            <div key={label} className="flex gap-2 text-xs mb-1 text-[#ccc] items-start">
+              <span className="text-[#888] whitespace-nowrap shrink-0">{label}</span>
+              <span className={`break-all ${mono ? 'font-mono text-[0.7rem]' : ''}`}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* セッション名（2行折り返し） */}
+      <span className="flex-1 text-sm leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        {isActive && '⭐ '}
+        {session.title || '(無題)'}
+      </span>
+
+      {/* ミートボールメニューボタン */}
+      <div className="shrink-0 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
         <button
-          className="bg-none border-none p-0 cursor-pointer text-base leading-none mr-2 shrink-0"
-          onClick={(e) => { e.stopPropagation(); onHoverInfo(session.id); }}
-        >
-          {session.psets_icon || '🔵'}
-        </button>
-
-        {/* セッション情報ポップオーバー */}
-        {hoverInfoSessionId === session.id && (
-          <div className="absolute left-0 top-full mt-2 bg-[#1a1a2e] border border-[#444] rounded-md p-3 w-[280px] z-[1000] shadow-lg">
-            {[
-              { label: '📅 日付:', value: session.created_at ? formatDate(session.created_at) : '(不明)' },
-              { label: '🎯 パラメータセット:', value: `${session.psets_icon || ''} ${session.psets_name || '(なし)'}` },
-              { label: '🤖 LLM:', value: session.model || '(不明)' },
-              { label: '📁 プロジェクト:', value: session.project_path || '(なし)', mono: true },
-              { label: '💬 チャット数:', value: String(session.message_count ?? 0) },
-            ].map(({ label, value, mono }) => (
-              <div key={label} className="flex gap-2 text-xs mb-1 text-[#ccc] items-start">
-                <span className="text-[#888] whitespace-nowrap shrink-0">{label}</span>
-                <span className={`break-all ${mono ? 'font-mono text-[0.7rem]' : ''}`}>{value}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
-          {isActive && '⭐ '}
-          {session.title || '(無題)'}
-        </span>
+          className="p-1 text-[#888] hover:text-white text-base leading-none rounded hover:bg-[#333]"
+          onClick={() => onMenuOpen(isMenuOpen ? null : session.id)}
+          title="メニュー"
+        >⋯</button>
       </div>
 
-      {/* アクションボタン */}
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-        {!isTrash && <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onExport(session.id, e)} title="エクスポート">📥</button>}
-        {!isTrash && <button className="p-1 text-xs text-[#888] hover:text-white" onClick={() => onMoveStart(session.id)} title="フォルダに移動">📂</button>}
-        {!isTrash && <button className="p-1 text-xs text-[#888] hover:text-white" onClick={(e) => onEdit(session, e)} title="編集">✏️</button>}
-        {isTrash && (
-          <button
-            className="p-1 text-xs text-[#888] hover:text-[#4a9eff]"
-            onClick={(e) => { e.stopPropagation(); onMoveSelect(session.id, null); }}
-            title="元に戻す"
-          >↩️</button>
-        )}
-        <button
-          className={`p-1 text-xs text-[#888] hover:text-[#ff4444] ${isTrash ? 'opacity-100' : ''}`}
-          onClick={(e) => onDelete(session.id, e)}
-          title={isTrash ? '完全に削除' : 'ゴミ箱へ'}
-        >🗑️</button>
-      </div>
-
-      {/* フォルダ移動メニュー */}
-      {isMoving && (
+      {/* ドロップダウンメニュー */}
+      {isMenuOpen && (
         <div
-          className="absolute right-0 top-full mt-1 bg-[#1a1a2e] border border-[#444] rounded-md p-2 w-48 z-[1000] shadow-lg"
+          className="absolute right-0 top-full mt-1 bg-[#1a1a2e] border border-[#444] rounded-md py-1 w-44 z-[1000] shadow-lg"
           onClick={e => e.stopPropagation()}
         >
-          <div className="text-xs text-[#888] mb-2 px-1">移動先フォルダ</div>
-          <button
-            className="w-full text-left px-2 py-1.5 text-xs text-[#ccc] hover:bg-[#333] rounded"
-            onClick={() => onMoveSelect(session.id, null)}
-          >
-            🚫 フォルダなし
-          </button>
-          {folders.map(f => (
-            <button
-              key={f.id}
-              className={`w-full text-left px-2 py-1.5 text-xs text-[#ccc] hover:bg-[#333] rounded ${session.folder_id === f.id ? 'text-[#4a9eff]' : ''}`}
-              onClick={() => onMoveSelect(session.id, f.id)}
-            >
-              {f.icon || '📁'} {f.name}
-              {session.folder_id === f.id && ' ✓'}
-            </button>
-          ))}          <button
-            className="w-full text-left px-2 py-1.5 text-xs text-[#888] hover:bg-[#333] rounded mt-1 border-t border-[#333] pt-2"
-            onClick={() => onMoveSelect(session.id, session.folder_id ?? null)}
-          >
-            キャンセル
-          </button>
+          {isTrash ? (
+            <>
+              <button
+                className="w-full text-left px-3 py-2 text-xs text-[#ccc] hover:bg-[#333]"
+                onClick={(e) => { onMoveSelect(session.id, null); onMenuOpen(null); }}
+              >↩️ 元に戻す</button>
+              <div className="border-t border-[#333] my-1" />
+              <button
+                className="w-full text-left px-3 py-2 text-xs text-[#ff4444] hover:bg-[#333]"
+                onClick={(e) => { onDelete(session.id, e); onMenuOpen(null); }}
+              >🗑️ 完全に削除</button>
+            </>
+          ) : (
+            <>
+              <button
+                className="w-full text-left px-3 py-2 text-xs text-[#ccc] hover:bg-[#333]"
+                onClick={(e) => { onExport(session.id, e); onMenuOpen(null); }}
+              >📥 エクスポート</button>
+              <button
+                className="w-full text-left px-3 py-2 text-xs text-[#ccc] hover:bg-[#333]"
+                onClick={(e) => { onEdit(session, e); onMenuOpen(null); }}
+              >✏️ 編集</button>
+              <div className="border-t border-[#333] my-1" />
+              <div className="px-3 py-1 text-xs text-[#888]">フォルダに移動</div>
+              <button
+                className={`w-full text-left px-3 py-2 text-xs hover:bg-[#333] ${!session.folder_id ? 'text-[#4a9eff]' : 'text-[#ccc]'}`}
+                onClick={() => { onMoveSelect(session.id, null); onMenuOpen(null); }}
+              >🚫 フォルダなし {!session.folder_id && '✓'}</button>
+              {folders.map(f => (
+                <button
+                  key={f.id}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-[#333] ${session.folder_id === f.id ? 'text-[#4a9eff]' : 'text-[#ccc]'}`}
+                  onClick={() => { onMoveSelect(session.id, f.id); onMenuOpen(null); }}
+                >
+                  {f.icon || '📁'} {f.name} {session.folder_id === f.id && '✓'}
+                </button>
+              ))}
+              <div className="border-t border-[#333] my-1" />
+              <button
+                className="w-full text-left px-3 py-2 text-xs text-[#ff4444] hover:bg-[#333]"
+                onClick={(e) => { onDelete(session.id, e); onMenuOpen(null); }}
+              >🗑️ ゴミ箱へ</button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -185,7 +197,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [folderFormName, setFolderFormName] = useState('');
   const [folderFormIcon, setFolderFormIcon] = useState('📁');
-  const [movingSessionId, setMovingSessionId] = useState<number | null>(null);
+  const [menuOpenSessionId, setMenuOpenSessionId] = useState<number | null>(null);
 
   // 新規セッション作成直後はメッセージ再取得をスキップするフラグ
   const skipFetchMessagesRef = useRef(false);
@@ -809,13 +821,13 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                         folders={folders}
                         isActive={currentSession === session.id}
                         hoverInfoSessionId={hoverInfoSessionId}
-                        movingSessionId={movingSessionId}
+                        menuOpenSessionId={menuOpenSessionId}
                         onSelect={() => setCurrentSession(session.id)}
                         onHoverInfo={(id) => setHoverInfoSessionId(hoverInfoSessionId === id ? null : id)}
+                        onMenuOpen={setMenuOpenSessionId}
                         onExport={handleExportSession}
                         onEdit={openSessionEditModal}
                         onDelete={handleDeleteSession}
-                        onMoveStart={(id) => setMovingSessionId(id)}
                         onMoveSelect={handleMoveSession}
                         formatDate={formatDate}
                       />
@@ -842,13 +854,13 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                     folders={folders}
                     isActive={currentSession === session.id}
                     hoverInfoSessionId={hoverInfoSessionId}
-                    movingSessionId={movingSessionId}
+                    menuOpenSessionId={menuOpenSessionId}
                     onSelect={() => setCurrentSession(session.id)}
                     onHoverInfo={(id) => setHoverInfoSessionId(hoverInfoSessionId === id ? null : id)}
+                    onMenuOpen={setMenuOpenSessionId}
                     onExport={handleExportSession}
                     onEdit={openSessionEditModal}
                     onDelete={handleDeleteSession}
-                    onMoveStart={(id) => setMovingSessionId(id)}
                     onMoveSelect={handleMoveSession}
                     formatDate={formatDate}
                   />
@@ -884,14 +896,14 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                         folders={folders}
                         isActive={currentSession === session.id}
                         hoverInfoSessionId={hoverInfoSessionId}
-                        movingSessionId={movingSessionId}
+                        menuOpenSessionId={menuOpenSessionId}
                         isTrash={true}
                         onSelect={() => setCurrentSession(session.id)}
                         onHoverInfo={(id) => setHoverInfoSessionId(hoverInfoSessionId === id ? null : id)}
+                        onMenuOpen={setMenuOpenSessionId}
                         onExport={handleExportSession}
                         onEdit={openSessionEditModal}
                         onDelete={handleHardDeleteSession}
-                        onMoveStart={(id) => setMovingSessionId(id)}
                         onMoveSelect={handleMoveSession}
                         formatDate={formatDate}
                       />
