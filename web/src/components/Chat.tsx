@@ -740,7 +740,13 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                 className="flex-1 px-3 py-3 border border-[#333] rounded-md bg-[#0f0f23] text-white text-base resize-none min-h-[60px] max-h-[200px] font-inherit focus:outline-none focus:border-[#4a9eff]"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="メッセージを入力..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.ctrlKey && !loading && !isRetrying && !retryPending && input.trim()) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="メッセージを入力... (Ctrl+Enter で送信)"
                 disabled={loading || isRetrying || retryPending}
               />
               {loading || isRetrying ? (
