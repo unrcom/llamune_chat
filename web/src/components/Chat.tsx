@@ -437,9 +437,11 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
 
       let fullContent = '';
       let fullThinking = '';
+      let fullModel = '';
       for await (const chunk of api.sendMessage(sessionId, userMessage, undefined, controller.signal)) {
         fullContent = chunk.content;
         fullThinking = chunk.thinking || '';
+        if (chunk.model) fullModel = chunk.model;
         setStreamingContent(chunk.content);
         setStreamingThinking(chunk.thinking || '');
       }
@@ -448,6 +450,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
         role: 'assistant',
         content: fullContent,
         thinking: fullThinking || undefined,
+        model: fullModel || undefined,
       }]);
       setStreamingContent('');
       setStreamingThinking('');

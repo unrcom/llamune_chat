@@ -345,7 +345,7 @@ export async function* sendMessage(
   message: string,
   model?: string,
   signal?: AbortSignal
-): AsyncGenerator<{ content: string; thinking?: string; done: boolean }> {
+): AsyncGenerator<{ content: string; thinking?: string; model?: string; done: boolean }> {
   const response = await authFetch(`${API_BASE}/chat/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -382,6 +382,7 @@ export async function* sendMessage(
             yield {
               content: parsed.content || '',
               thinking: parsed.thinking,
+              model: parsed.model,
               done: parsed.done || false,
             };
           } catch {

@@ -218,6 +218,9 @@ router.post('/send', authMiddleware, async (req: AuthenticatedRequest, res: Resp
       saveMessage(sessionId, 'user', message);
       saveMessage(sessionId, 'assistant', fullContent, currentModel, fullThinking || undefined);
 
+      // 完了イベントにmodelを含めて送信
+      res.write(`data: ${JSON.stringify({ content: fullContent, thinking: fullThinking || undefined, model: currentModel, done: true })}\n\n`);
+
       res.write('data: [DONE]\n\n');
     } catch (streamError) {
       console.error('Stream error:', streamError);
