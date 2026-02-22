@@ -231,6 +231,14 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
         setSessions(sessionsData);
         setFolders(foldersData);
         setTrashFolder(trashData);
+
+        // 全フォルダを閉じた状態に初期化（currentSessionが含まれるフォルダは開く）
+        const currentSessionData = sessionsData.find((s: { id: number }) => s.id === currentSession);
+        const openFolderId = currentSessionData?.folder_id;
+        const allFolderIds = new Set<number>(
+          [...foldersData, ...(trashData ? [trashData] : [])].map((f: { id: number }) => f.id).filter((id: number) => id !== openFolderId)
+        );
+        setCollapsedFolders(allFolderIds);
         if (templatesData.length > 0) {
           setSelectedTemplate(templatesData[0].id);
           setSelectedModel(templatesData[0].model || '');

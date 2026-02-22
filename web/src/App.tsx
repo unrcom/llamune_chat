@@ -30,8 +30,12 @@ function AppContent() {
 
   return (
     <>
-      {currentPage === 'chat' && <Chat onNavigateToModes={() => setCurrentPage('psets')} />}
-      {currentPage === 'psets' && <ParameterSetsManagement onNavigateToChat={() => setCurrentPage('chat')} />}
+      <Chat onNavigateToModes={() => setCurrentPage('psets')} />
+      {currentPage === 'psets' && (
+        <div className="fixed inset-0 z-50 bg-[#1a1a2e]">
+          <ParameterSetsManagement onNavigateToChat={() => setCurrentPage('chat')} />
+        </div>
+      )}
     </>
   );
 }
