@@ -4,6 +4,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import { MONKEY_URL, INSTANCE_ID } from '../utils/monkey.js';
 
 import authRouter from './routes/auth.js';
 import psetsTemplateRouter from './routes/psets_template.js';
@@ -41,6 +42,14 @@ app.use('/api/folders', foldersRouter);
 // ヘルスチェック
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// インスタンス情報
+app.get('/api/instance-info', (req, res) => {
+  res.json({
+    instance_id: INSTANCE_ID,
+    monkey_url: MONKEY_URL,
+  });
 });
 
 // 404 ハンドラー

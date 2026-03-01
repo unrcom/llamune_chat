@@ -4,6 +4,7 @@
 
 import 'dotenv/config';
 import { initDatabase, getAllPsetsTemplates } from './utils/database.js';
+import { registerToMonkey, unregisterFromMonkey } from './utils/monkey.js';
 import app from './api/server.js';
 
 const PORT = process.env.PORT || 3000;
@@ -24,7 +25,7 @@ templates.forEach(template => {
 });
 
 // APIサーバー起動
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log('');
   console.log(`🚀 API server running on http://localhost:${PORT}`);
   console.log('');
@@ -37,4 +38,17 @@ app.listen(PORT, () => {
   console.log('  GET  /api/sessions            - List sessions');
   console.log('  POST /api/chat/send           - Send message');
   console.log('');
+
+  // monkey へ登録
+  await registerToMonkey();
 });
+
+// 終了時：monkey から登録解除
+async function gracefulShutdown(signal: string) {
+  console.log(`\n${signal} received. Shutting down...`);
+  await unregisterFromMonkey();
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
