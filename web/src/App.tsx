@@ -14,6 +14,7 @@ type Page = 'chat' | 'psets';
 function AppContent() {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('chat');
+  const [chatKey, setChatKey] = useState(0);
 
   if (loading) {
     return (
@@ -30,10 +31,10 @@ function AppContent() {
 
   return (
     <>
-      <Chat onNavigateToModes={() => setCurrentPage('psets')} />
+      <Chat key={chatKey} onNavigateToModes={() => setCurrentPage('psets')} />
       {currentPage === 'psets' && (
         <div className="fixed inset-0 z-50 bg-[#1a1a2e]">
-          <ParameterSetsManagement onNavigateToChat={() => setCurrentPage('chat')} />
+          <ParameterSetsManagement onNavigateToChat={() => { setCurrentPage('chat'); setChatKey(k => k + 1); }} />
         </div>
       )}
     </>

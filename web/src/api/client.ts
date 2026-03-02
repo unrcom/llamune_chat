@@ -34,9 +34,9 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
-  
+
   let response = await fetch(url, { ...options, headers });
-  
+
   // 401 の場合はトークンリフレッシュを試みる
   if (response.status === 401 && refreshToken) {
     const refreshed = await refreshAccessToken();
@@ -46,12 +46,11 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
     }
   }
 
-  // リフレッシュしても401の場合はログイン画面へ
+  // リフレッシュしても401の場合はトークンをクリア（画面遷移はuseAuthに任せる）
   if (response.status === 401) {
     clearTokens();
-    window.location.href = '/';
   }
-  
+
   return response;
 }
 
@@ -65,12 +64,12 @@ async function refreshAccessToken(): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
-    
+
     if (!response.ok) {
       clearTokens();
       return false;
     }
-    
+
     const data = await response.json();
     setTokens(data.accessToken, data.refreshToken);
     return true;
@@ -90,12 +89,12 @@ export async function login(username: string, password: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || 'Login failed');
   }
-  
+
   const data = await response.json();
   setTokens(data.accessToken, data.refreshToken);
   return data.user;
@@ -107,12 +106,12 @@ export async function register(username: string, password: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || 'Registration failed');
   }
-  
+
   const data = await response.json();
   setTokens(data.accessToken, data.refreshToken);
   return data.user;
@@ -323,7 +322,7 @@ export async function updateSessionPsets(id: number, data: {
 export async function exportSession(id: number): Promise<{ blob: Blob; filename: string }> {
   const response = await authFetch(`${API_BASE}/sessions/${id}/export`);
   if (!response.ok) throw new Error('Failed to export session');
-  
+
   const contentDisposition = response.headers.get('Content-Disposition');
   let filename = `llamune_chat_${id}.json`;
   if (contentDisposition) {
@@ -337,7 +336,7 @@ export async function exportSession(id: number): Promise<{ blob: Blob; filename:
       }
     }
   }
-  
+
   const blob = await response.blob();
   return { blob, filename };
 }
@@ -382,7 +381,7 @@ export async function* sendMessage(
         if (line.startsWith('data: ')) {
           const data = line.slice(6);
           if (data === '[DONE]') return;
-          
+
           try {
             const parsed = JSON.parse(data);
             yield {
@@ -441,7 +440,7 @@ export async function* retryMessage(
         if (line.startsWith('data: ')) {
           const data = line.slice(6);
           if (data === '[DONE]') return;
-          
+
           try {
             const parsed = JSON.parse(data);
             yield {
@@ -514,7 +513,7 @@ export async function getDirectoryTree(path?: string): Promise<DirectoryNode> {
   const url = path
     ? `${API_BASE}/filesystem/tree?path=${encodeURIComponent(path)}`
     : `${API_BASE}/filesystem/tree`;
-  
+
   const response = await authFetch(url);
   if (!response.ok) throw new Error('Failed to fetch directory tree');
   return await response.json();

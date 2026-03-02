@@ -796,9 +796,13 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
             </button>
             <h2 className="m-0 text-lg text-[#4a9eff] font-semibold flex-1">llamune_chat</h2>
           </div>
-          <button className="w-full py-3 bg-[#4a9eff] text-white border-none rounded-md cursor-pointer text-sm hover:bg-[#3a8eef] transition-colors" onClick={() => setShowNewChat(true)}>
-            + 新しいチャット
-          </button>
+          {psetsTemplates.filter(t => t.model).length > 0 ? (
+            <button className="w-full py-3 bg-[#4a9eff] text-white border-none rounded-md cursor-pointer text-sm hover:bg-[#3a8eef] transition-colors" onClick={() => setShowNewChat(true)}>
+              + 新しいチャット
+            </button>
+          ) : (
+            <p className="text-xs text-[#ff6b6b] font-bold text-center py-2">⚠️ パラメータセット管理でモデルを設定してください</p>
+          )}
           <button className="w-full py-3 mt-2 bg-transparent text-[#888] border border-[#444] rounded-md cursor-pointer text-sm hover:bg-[#333] hover:text-[#4a9eff] hover:border-[#4a9eff] transition-colors" onClick={onNavigateToModes}>
             ⚙️ パラメータセット管理
           </button>
@@ -1111,9 +1115,13 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           <div className="flex flex-col justify-center items-center h-full text-[#888]">
             <h2 className="text-4xl mb-2 text-white">🔵 llamune_chat</h2>
             <p className="mb-6">新しいチャットを開始するか、左のセッションを選択してください</p>
+            {psetsTemplates.filter(t => t.model).length > 0 ? (
             <button className="px-6 py-3 bg-[#4a9eff] text-white border-none rounded-md cursor-pointer text-base hover:bg-[#3a8eef] transition-colors" onClick={() => setShowNewChat(true)}>
               + 新しいチャット
             </button>
+          ) : (
+            <p className="text-sm text-[#ff6b6b] font-bold text-center py-2">⚠️ パラメータセット管理でモデルを設定してください</p>
+          )}
           </div>
         )}
       </main>
@@ -1127,7 +1135,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
               <label className="block text-[#ccc] text-sm mb-2">パラメータセット</label>
               <select className={inputCls} value={selectedTemplate ?? ''} onChange={(e) => setSelectedTemplate(e.target.value ? Number(e.target.value) : null)}>
                 <option value="">なし（カスタム設定）</option>
-                {psetsTemplates.map(t => (
+                {psetsTemplates.filter(t => t.model).map(t => (
                   <option key={t.id} value={t.id}>{t.icon} {t.psets_name}</option>
                 ))}
               </select>
